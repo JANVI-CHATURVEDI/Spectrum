@@ -63,6 +63,21 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const refreshUser = async (prefetched = null) => {
+    if (prefetched) {
+      setUser(prefetched);
+      return prefetched;
+    }
+    if (!token) return null;
+    try {
+      const res = await api.get('/api/auth/me/');
+      setUser(res.data.user);
+      return res.data;
+    } catch {
+      return null;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -75,6 +90,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         switchRole,
         setUser,
+        refreshUser,
       }}
     >
       {children}

@@ -133,6 +133,11 @@ class WasteReportViewSet(viewsets.ModelViewSet):
             citizen.impact_points += 20
             citizen.add_badge_if_missing('Waste Watcher')
             citizen.save(update_fields=['impact_points'])
+            try:
+                from core.badges import award_citizen_badges
+                award_citizen_badges(citizen)
+            except Exception:
+                pass
 
         try:
             from core.notifications import notify_report_submitted
@@ -172,6 +177,11 @@ class CitizenVerificationView(APIView):
                 citizen.impact_points += 30
                 citizen.add_badge_if_missing('Clean Street Contributor')
                 citizen.save(update_fields=['impact_points'])
+                try:
+                    from core.badges import award_citizen_badges
+                    award_citizen_badges(citizen)
+                except Exception:
+                    pass
         else:
             report.status = 'REOPENED'
             report.priority_score += 25.0

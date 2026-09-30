@@ -193,8 +193,8 @@ export default function Navbar({ activeTab, setActiveTab }) {
                 )}
               </div>
             )}
-            {user && role === 'CITIZEN' && (
-              <div className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 sm:flex">
+            {user && (role === 'CITIZEN' || role === 'WORKER') && (
+              <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                 <Award className="h-3.5 w-3.5 text-emerald-600" />
                 <span>{user.impact_points ?? 0} pts</span>
               </div>

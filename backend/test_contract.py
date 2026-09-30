@@ -210,6 +210,16 @@ class NotificationContractTests(ContractTestCase):
         self.assertTrue(any(r['kind'] == 'REPORT_SUBMITTED' for r in rows))
 
 
+    def test_location_and_address_required(self):
+        base = {'title': 'No spot', 'description': 'x', 'category': self.category.id, 'severity': 'LOW'}
+        no_addr = dict(base, latitude=28.63, longitude=77.22, address='')
+        self.assertEqual(self.client.post('/api/reports/', no_addr).status_code, 400)
+        no_coords = dict(base, address='Lane 5')
+        self.assertEqual(self.client.post('/api/reports/', no_coords).status_code, 400)
+        bad_coords = dict(base, address='Lane 5', latitude=999, longitude=77.22)
+        self.assertEqual(self.client.post('/api/reports/', bad_coords).status_code, 400)
+
+
 class ReportsContractTests(ContractTestCase):
     def test_report_list_lives_at_root(self):
         res = self.client.get('/api/reports/')

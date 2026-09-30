@@ -4,6 +4,8 @@ import MapView from '../components/MapView';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge';
+import ImpactCard from '../components/ImpactCard';
+import { useAuth } from '../context/AuthContext';
 import { Plus, CheckCircle, RefreshCw, AlertTriangle, Sparkles, Navigation } from 'lucide-react';
 
 import { ChevronRight, X, MapPin, Camera } from 'lucide-react';
@@ -15,6 +17,8 @@ const PICKUP_PREFS_KEY = 'swachdrishti.pickup.prefs.v1';
 const HOME_SPOT = { lat: 28.6280, lng: 77.2180 };
 
 export default function CitizenDashboard() {
+  const { user, refreshUser } = useAuth();
+  const [impact, setImpact] = useState({ stats: null, catalog: [] });
   const [reports, setReports] = useState([]);
   const [pickups, setPickups] = useState([]);
   const [hotspots, setHotspots] = useState([]);
@@ -58,6 +62,13 @@ export default function CitizenDashboard() {
         api.get('/api/hotspots/'),
         api.get('/api/reports/categories/').catch(() => ({ data: [] }))
       ]);
+      try {
+        const meRes = await api.get('/api/auth/me/');
+        if (meRes.data?.user) refreshUser(meRes.data.user);
+        setImpact({ stats: meRes.data?.stats || null, catalog: meRes.data?.badge_catalog?.citizen || [] });
+      } catch {
+        /* impact card stays hidden when logged out */
+      }
       setReports(repRes.data?.results || repRes.data || []);
       setPickups(pickRes.data?.results || pickRes.data || []);
       setHotspots(hotRes.data?.results || hotRes.data || []);
@@ -193,6 +204,14 @@ export default function CitizenDashboard() {
 
   const handleReportSubmit = async (e) => {
     e.preventDefault();
+    if (!address.trim()) {
+      alert('Please add a street landmark or area name so the crew can find the spot.');
+      return;
+    }
+    if (!gpsFix && coords.lat === HOME_SPOT.lat && coords.lng === HOME_SPOT.lng) {
+      alert('Please drop the pin on the map or tap Detect my live location.');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = new FormData();
@@ -202,7 +221,7 @@ export default function CitizenDashboard() {
       payload.append('severity', severity);
       payload.append('latitude', coords.lat);
       payload.append('longitude', coords.lng);
-      payload.append('address', address || 'Current pinned location');
+      payload.append('address', address.trim());
       if (photo) payload.append('image', photo);
 
       await api.post('/api/reports/', payload, {
@@ -285,14 +304,23 @@ export default function CitizenDashboard() {
         </div>
       </div>
 
+      {user && impact.stats && (
+        <ImpactCard
+          user={user}
+          stats={impact.stats}
+          catalog={impact.catalog}
+          headline="My Civic Impact"
+          subline={`${impact.stats.reports} reports · ${impact.stats.verifications} cleanups confirmed`}
+        />
+      )}
+
       <div className="flex border-b border-slate-200 gap-4 text-sm font-semibold">
         <button
           onClick={() => setViewTab('reports')}
           className={`pb-3 transition-colors ${viewTab === 'reports' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-slate-500 hover:text-slate-800'}`}
         >
           My & City Reports ({reports.length})
-        </button>
-        <button
+        </button>        <button
           onClick={() => setViewTab('pickups')}
           className={`pb-3 transition-colors ${viewTab === 'pickups' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-slate-500 hover:text-slate-800'}`}
         >
@@ -503,7 +531,7 @@ export default function CitizenDashboard() {
 
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <label className="block text-xs font-semibold text-slate-700">Location / Street Landmark</label>
+                  <label className="block text-xs font-semibold text-slate-700">Location / Street Landmark <span className="text-rose-500">*</span></label>
                   <button
                     type="button"
                     onClick={detectMyLocation}
@@ -516,7 +544,7 @@ export default function CitizenDashboard() {
                 </div>
                 <input
                   type="text"
-                  placeholder="e.g. Near Metro Pillar 42"
+                  placeholder="Required — e.g. Near Metro Pillar 42"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"

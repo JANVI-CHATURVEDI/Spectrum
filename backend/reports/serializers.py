@@ -35,6 +35,24 @@ class WasteReportSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'priority_score', 'priority_level', 'priority_factors', 'created_at', 'updated_at']
 
+    def validate(self, data):
+        lat = data.get('latitude', getattr(self.instance, 'latitude', None))
+        lng = data.get('longitude', getattr(self.instance, 'longitude', None))
+        address = data.get('address', getattr(self.instance, 'address', '') or '')
+        if lat is None or lng is None:
+            raise serializers.ValidationError(
+                {'latitude': 'Pin the location on the map or use Detect location.'})
+        try:
+            lat_f, lng_f = float(lat), float(lng)
+        except (TypeError, ValueError):
+            raise serializers.ValidationError({'latitude': 'Invalid coordinates.'})
+        if not (-90 <= lat_f <= 90 and -180 <= lng_f <= 180):
+            raise serializers.ValidationError({'latitude': 'Coordinates are out of range.'})
+        if not (address or '').strip():
+            raise serializers.ValidationError(
+                {'address': 'A street landmark or area name is required.'})
+        return data
+
     def get_duplicates_count(self, obj):
         annotated = getattr(obj, 'duplicates_count', None)
         if annotated is not None:

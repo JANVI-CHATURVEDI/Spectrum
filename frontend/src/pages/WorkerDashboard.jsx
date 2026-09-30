@@ -3,9 +3,13 @@ import api from '../api/client';
 import MapView from '../components/MapView';
 import StatusBadge from '../components/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge';
+import ImpactCard from '../components/ImpactCard';
+import { useAuth } from '../context/AuthContext';
 import { CheckCircle2, Clock, MapPin, Camera, Play, CheckCheck, RefreshCw, Navigation, Radio, Sparkles } from 'lucide-react';
 
 export default function WorkerDashboard() {
+  const { user, refreshUser } = useAuth();
+  const [impact, setImpact] = useState({ stats: null, catalog: [] });
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -23,6 +27,15 @@ export default function WorkerDashboard() {
       if (showLoading) setLoading(true);
       const res = await api.get('/api/operations/tasks/');
       setTasks(res.data?.results || res.data || []);
+      if (showLoading) {
+        try {
+          const meRes = await api.get('/api/auth/me/');
+          if (meRes.data?.user) refreshUser(meRes.data.user);
+          setImpact({ stats: meRes.data?.stats || null, catalog: meRes.data?.badge_catalog?.worker || [] });
+        } catch {
+          /* impact card stays hidden when logged out */
+        }
+      }
     } catch (err) {
       console.error('Failed to load tasks:', err);
     } finally {
@@ -89,6 +102,15 @@ export default function WorkerDashboard() {
       setPhotoPreview(null);
       setPrecheck(null);
       await fetchTasks(false);
+      if (newStatus === 'COMPLETED') {
+        try {
+          const meRes = await api.get('/api/auth/me/');
+          if (meRes.data?.user) refreshUser(meRes.data.user);
+          setImpact({ stats: meRes.data?.stats || null, catalog: meRes.data?.badge_catalog?.worker || [] });
+        } catch {
+          /* points refresh best-effort */
+        }
+      }
       if (selectedTask?.id === taskId) {
         setSelectedTask(prev => prev ? { 
           ...prev, 
@@ -215,6 +237,16 @@ export default function WorkerDashboard() {
           </div>
         </div>
       </div>
+
+      {user && impact.stats && (
+        <ImpactCard
+          user={user}
+          stats={impact.stats}
+          catalog={impact.catalog}
+          headline="My Field Impact"
+          subline={`${impact.stats.completions} cleanups · ${impact.stats.quality} AI-verified quality`}
+        />
+      )}
 
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white p-3.5 rounded-xl border border-slate-200">

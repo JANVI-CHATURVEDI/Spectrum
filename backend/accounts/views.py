@@ -79,8 +79,11 @@ class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from core.badges import get_user_stats, badge_catalog
         return Response({
-            'user': UserSerializer(request.user).data
+            'user': UserSerializer(request.user).data,
+            'stats': get_user_stats(request.user),
+            'badge_catalog': badge_catalog(),
         })
 
 class WorkersListView(generics.ListAPIView):

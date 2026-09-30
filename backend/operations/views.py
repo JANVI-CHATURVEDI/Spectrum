@@ -204,6 +204,15 @@ class TransitionTaskStatusView(APIView):
 
         task.save()
 
+        if new_status == 'COMPLETED' and task.worker:
+            try:
+                from core.badges import WORKER_COMPLETION_POINTS, award_worker_badges
+                task.worker.impact_points += WORKER_COMPLETION_POINTS
+                task.worker.save(update_fields=['impact_points'])
+                award_worker_badges(task.worker)
+            except Exception:
+                pass
+
         if new_status == 'COMPLETED' and task.report:
             try:
                 from core.notifications import notify_verification_required
