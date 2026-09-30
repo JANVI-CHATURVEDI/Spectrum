@@ -1,6 +1,9 @@
+import logging
 from django.db import models
 from django.conf import settings
 from core.priority import calculate_priority
+
+logger = logging.getLogger(__name__)
 
 class WasteCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -94,6 +97,26 @@ class WasteReport(models.Model):
         self.priority_factors = factors
         self.save(update_fields=['priority_score', 'priority_level', 'priority_factors'])
         return score
+
+    def save(self, *args, **kwargs):
+        """
+        Keep the public URL fields in sync with whatever was uploaded.
+
+        The React app renders `image_url` / `after_image_url`, while uploads
+        arrive on the `image` / `after_image` FileFields - without this the
+        photo is stored but never appears anywhere in the UI.
+        """
+        if self.image:
+            try:
+                self.image_url = self.image.url
+            except Exception:
+                logger.warning("Could not resolve storage URL for report image")
+        if self.after_image:
+            try:
+                self.after_image_url = self.after_image.url
+            except Exception:
+                logger.warning("Could not resolve storage URL for after image")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Report #{self.id}: {self.category.name} at {self.address} ({self.status})"

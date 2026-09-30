@@ -156,9 +156,11 @@ if USE_NEON_OBJECT_STORAGE:
     AWS_S3_SIGNATURE_VERSION = 's3v4'
     # Keep filenames unique rather than overwriting on re-upload
     AWS_S3_FILE_OVERWRITE = False
-    # Neon buckets are private by default; presigned reads work either way
+    # Neon buckets are provisioned as public_read, so store *stable* URLs.
+    # image_url is persisted in Postgres - a presigned URL would expire in
+    # 1h and every photo in an old report would stop loading.
     AWS_DEFAULT_ACL = None
-    AWS_QUERYSTRING_AUTH = True
+    AWS_QUERYSTRING_AUTH = False
     AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=3600'}
 
 STORAGES = {
