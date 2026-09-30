@@ -1,0 +1,170 @@
+from rest_framework import viewsets, generics, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.utils import timezone
+from datetime import timedelta
+
+from .models import WasteCategory, WasteReport, CitizenVerification
+from .serializers import WasteCategorySerializer, WasteReportSerializer, CitizenVerificationSerializer
+from hotspots.models import Hotspot
+from core.geo import haversine_distance
+from core.priority import calculate_priority
+
+class WasteCategoryListView(generics.ListAPIView):
+    queryset = WasteCategory.objects.all()
+    serializer_class = WasteCategorySerializer
+    permission_classes = [AllowAny]
+
+class CheckDuplicateReportView(APIView):
+    """
+    Checks if a recent report exists near the specified coordinates (within 60m).
+    Allows citizens to join an existing incident or submit separately.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        lat = float(request.data.get('latitude', 0.0))
+        lng = float(request.data.get('longitude', 0.0))
+        
+        two_days_ago = timezone.now() - timedelta(days=2)
+        candidates = WasteReport.objects.filter(
+            created_at__gte=two_days_ago,
+            status__in=['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS']
+        )
+        
+        matches = []
+        for rep in candidates:
+            dist = haversine_distance(lat, lng, rep.latitude, rep.longitude)
+            if dist <= 75.0:  # Within 75 meters
+                matches.append({
+                    'id': rep.id,
+                    'title': rep.title or f"{rep.category.name} at {rep.address}",
+                    'category': rep.category.name,
+                    'status': rep.status,
+                    'distance_meters': round(dist, 1),
+                    'created_at': rep.created_at,
+                    'image_url': rep.image_url or (rep.image.url if rep.image else ''),
+                })
+
+        return Response({
+            'has_duplicate': len(matches) > 0,
+            'match_count': len(matches),
+            'nearby_incidents': matches,
+            'message': 'Possible existing incident detected nearby.' if matches else 'No duplicate incidents nearby.'
+        })
+
+class WasteReportViewSet(viewsets.ModelViewSet):
+    queryset = WasteReport.objects.all()
+    serializer_class = WasteReportSerializer
+    permission_classes = [AllowAny]  # Allow citizens, anonymous demos, and authenticated staff
+
+    def get_queryset(self):
+        qs = WasteReport.objects.select_related('category', 'citizen', 'citizen_verification').all()
+        status_param = self.request.query_params.get('status')
+        priority_param = self.request.query_params.get('priority')
+        category_param = self.request.query_params.get('category')
+        zone_param = self.request.query_params.get('zone')
+        my_reports = self.request.query_params.get('my_reports')
+        
+        if status_param:
+            qs = qs.filter(status=status_param.upper())
+        if priority_param:
+            qs = qs.filter(priority_level=priority_param.upper())
+        if category_param:
+            qs = qs.filter(category__id=category_param)
+        if zone_param:
+            qs = qs.filter(zone=zone_param)
+        if my_reports and self.request.user.is_authenticated:
+            qs = qs.filter(citizen=self.request.user)
+            
+        return qs
+
+    def perform_create(self, serializer):
+        citizen = self.request.user if self.request.user.is_authenticated else None
+        report = serializer.save(citizen=citizen)
+        
+        # Calculate nearby reports in 150m radius
+        nearby_count = 0
+        all_reports = WasteReport.objects.exclude(id=report.id).filter(
+            status__in=['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS']
+        )
+        for other in all_reports:
+            if haversine_distance(report.latitude, report.longitude, other.latitude, other.longitude) <= 150.0:
+                nearby_count += 1
+                
+        # Check if inside active hotspot
+        is_recurring = False
+        hotspots = Hotspot.objects.filter(status='ACTIVE')
+        for h in hotspots:
+            if haversine_distance(report.latitude, report.longitude, h.latitude, h.longitude) <= h.radius_meters:
+                is_recurring = True
+                h.report_count += 1
+                h.save(update_fields=['report_count'])
+                break
+                
+        # Context sensitivity heuristic
+        is_sensitive = any(kw in (report.address or '').lower() for kw in ['school', 'hospital', 'market', 'station', 'metro', 'plaza'])
+        
+        # Compute explainable priority
+        report.update_priority(
+            nearby_count=nearby_count,
+            age_hours=0.0,
+            is_recurring=is_recurring,
+            is_sensitive=is_sensitive
+        )
+
+        # Reward citizen impact points
+        if citizen:
+            citizen.impact_points += 20
+            citizen.add_badge_if_missing('Waste Watcher')
+            citizen.save(update_fields=['impact_points'])
+
+class CitizenVerificationView(APIView):
+    """
+    Allows a citizen to confirm resolution or reopen the report with feedback.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk):
+        try:
+            report = WasteReport.objects.get(pk=pk)
+        except WasteReport.DoesNotExist:
+            return Response({'error': 'Report not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        is_resolved = request.data.get('is_resolved', True)
+        reopen_reason = request.data.get('reopen_reason', '')
+        feedback = request.data.get('feedback', '')
+        citizen = request.user if request.user.is_authenticated else report.citizen
+
+        verification, created = CitizenVerification.objects.update_or_create(
+            report=report,
+            defaults={
+                'citizen': citizen,
+                'is_resolved': is_resolved,
+                'reopen_reason': reopen_reason if not is_resolved else '',
+                'feedback': feedback
+            }
+        )
+
+        if is_resolved:
+            report.status = 'CITIZEN_VERIFIED'
+            report.verified_at = timezone.now()
+            report.save(update_fields=['status', 'verified_at'])
+            if citizen:
+                citizen.impact_points += 30
+                citizen.add_badge_if_missing('Clean Street Contributor')
+                citizen.save(update_fields=['impact_points'])
+        else:
+            report.status = 'REOPENED'
+            # Increase priority score when reopened by citizen
+            report.priority_score += 25.0
+            report.priority_level = 'CRITICAL' if report.priority_score >= 65 else 'HIGH'
+            report.priority_factors.append(f"Reopened by citizen: {reopen_reason}")
+            report.save(update_fields=['status', 'priority_score', 'priority_level', 'priority_factors'])
+
+        return Response({
+            'message': 'Citizen verification recorded successfully.',
+            'report_status': report.status,
+            'verification': CitizenVerificationSerializer(verification).data
+        })
