@@ -98,17 +98,27 @@ class WasteReport(models.Model):
         return score
 
     def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Sync public URLs AFTER the file is stored. Before the first save
+        # the FieldFile still carries the raw client filename (no upload_to
+        # prefix), so resolving .url early produces a bogus bucket-root URL.
+        synced = {}
         if self.image:
             try:
-                self.image_url = self.image.url
+                if self.image_url != self.image.url:
+                    synced['image_url'] = self.image.url
             except Exception:
                 logger.warning("Could not resolve storage URL for report image")
         if self.after_image:
             try:
-                self.after_image_url = self.after_image.url
+                if self.after_image_url != self.after_image.url:
+                    synced['after_image_url'] = self.after_image.url
             except Exception:
                 logger.warning("Could not resolve storage URL for after image")
-        super().save(*args, **kwargs)
+        if synced:
+            type(self).objects.filter(pk=self.pk).update(**synced)
+            self.image_url = synced.get('image_url', self.image_url)
+            self.after_image_url = synced.get('after_image_url', self.after_image_url)
 
     def __str__(self):
         return f"Report #{self.id}: {self.category.name} at {self.address} ({self.status})"

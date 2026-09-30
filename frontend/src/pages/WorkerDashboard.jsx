@@ -347,11 +347,11 @@ export default function WorkerDashboard() {
                 </div>
               </div>
 
-              {getTaskReport(selectedTask)?.image_url && (
+              {(getTaskReport(selectedTask)?.image_url || getTaskReport(selectedTask)?.image) && (
                 <div>
                   <div className="text-[11px] font-bold text-slate-700 mb-1">Citizen Before Photo:</div>
                   <img
-                    src={getTaskReport(selectedTask).image_url}
+                    src={getTaskReport(selectedTask).image_url || getTaskReport(selectedTask).image}
                     alt="Before"
                     className="w-full h-32 object-cover rounded-lg border border-slate-200"
                   />
