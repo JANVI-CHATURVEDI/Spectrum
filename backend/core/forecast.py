@@ -1,10 +1,3 @@
-"""
-Explainable hotspot forecasting.
-
-Deliberately simple and auditable: day-of-week seasonality multiplied by a
-recent location-density signal. No black box - every score ships with the
-numbers that produced it, which is what a municipal reviewer wants to see.
-"""
 from datetime import timedelta
 from collections import Counter
 
@@ -12,17 +5,12 @@ from django.utils import timezone
 
 from core.geo import haversine_distance
 
-# Relative municipal waste-generation weight per weekday (0=Mon .. 6=Sun).
 DAY_WEIGHT = {0: 1.00, 1: 1.02, 2: 1.04, 3: 1.08, 4: 1.18, 5: 1.32, 6: 1.24}
 
 OPEN_STATUSES = ['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'REOPENED']
 
 
 def forecast_hotspots(radius_meters: float = 250.0, horizon_hours: int = 48) -> list[dict]:
-    """
-    Cluster open reports by proximity, score how likely each cluster is to
-    overflow inside `horizon_hours`, and explain the score.
-    """
     from reports.models import WasteReport
 
     now = timezone.now()
@@ -34,7 +22,6 @@ def forecast_hotspots(radius_meters: float = 250.0, horizon_hours: int = 48) -> 
     if not reports:
         return []
 
-    # Union-find style clustering (O(n^2) but n is bounded by open reports)
     parent = list(range(len(reports)))
 
     def find(i):
@@ -58,7 +45,6 @@ def forecast_hotspots(radius_meters: float = 250.0, horizon_hours: int = 48) -> 
     for i in range(len(reports)):
         clusters.setdefault(find(i), []).append(i)
 
-    # Same-weekday volume over the last 4 weeks => seasonal baseline
     weekday_history = Counter()
     start = now - timedelta(days=28)
     for created in WasteReport.objects.filter(created_at__gte=start).values_list('created_at', flat=True):
@@ -78,12 +64,9 @@ def forecast_hotspots(radius_meters: float = 250.0, horizon_hours: int = 48) -> 
         )
         criticals = sum(1 for it in items if it['priority_level'] == 'CRITICAL')
 
-        # Density: reports per radius, capped
         density = min(open_now / 5.0, 1.0)
-        # Seasonality: is this a historically busy weekday?
         season = (today_count / 4.0) / 10.0 if today_count else 0.5
         season = min(season, 1.0)
-        # Age: unresolved piles rot
         age = min(oldest_age_h / 48.0, 1.0)
 
         score = round(min(100.0, (density * 45 + season * 30 + age * 25) * day_factor), 1)

@@ -19,7 +19,7 @@ class WasteStreamGuide(models.Model):
 
 class QuizQuestion(models.Model):
     question = models.CharField(max_length=300)
-    options = models.JSONField(default=list)  # list of strings
+    options = models.JSONField(default=list)
     correct_option_index = models.IntegerField(default=0)
     explanation = models.TextField()
     difficulty = models.CharField(max_length=20, default='Medium')
@@ -35,7 +35,7 @@ class CollectionPoint(models.Model):
     address = models.CharField(max_length=300)
     zone = models.CharField(max_length=100, default='Zone 1 - Central')
     bin_type = models.CharField(max_length=100, default='Dual Organic & Recyclable Hub')
-    fill_level = models.IntegerField(default=45)  # 0 to 100%
+    fill_level = models.IntegerField(default=45)
     is_active = models.BooleanField(default=True)
     last_cleared_at = models.DateTimeField(auto_now_add=True)
 

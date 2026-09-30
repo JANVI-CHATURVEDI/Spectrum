@@ -14,7 +14,6 @@ export default function AdminDashboard() {
   const [forecast, setForecast] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // NL Search
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -22,19 +21,23 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [ovRes, clRes, repRes, hotRes, aiRes, forecastRes] = await Promise.all([
+      const [ovRes, clRes, repRes, hotRes] = await Promise.all([
         api.get('/api/analytics/overview/').catch(() => ({ data: null })),
         api.get('/api/analytics/cleanliness-index/').catch(() => ({ data: [] })),
         api.get('/api/reports/'),
         api.get('/api/hotspots/'),
-        api.get('/api/ai/insights/').catch(() => ({ data: null })),
-        api.get('/api/ai/forecast/').catch(() => ({ data: null })),
       ]);
-      setForecast(forecastRes.data);
       setOverview(ovRes.data);
       setCleanliness(clRes.data?.zones || clRes.data?.results || (Array.isArray(clRes.data) ? clRes.data : []));
       setReports(repRes.data?.results || repRes.data || []);
       setHotspots(hotRes.data?.results || hotRes.data || []);
+      setLoading(false);
+
+      const [aiRes, forecastRes] = await Promise.all([
+        api.get('/api/ai/insights/').catch(() => ({ data: null })),
+        api.get('/api/ai/forecast/').catch(() => ({ data: null })),
+      ]);
+      setForecast(forecastRes.data);
       setAiInsights(aiRes.data);
     } catch (err) {
       console.error('Admin data fetch error:', err);
@@ -63,7 +66,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-slate-800">
         <div>
           <span className="text-xs font-semibold tracking-wider uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full">
@@ -75,7 +77,6 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Top KPIs */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white/5 border border-white/10 p-3 rounded-xl text-center">
             <div className="text-xl font-bold text-emerald-400">{overview?.resolved_reports_count ?? 142}</div>
@@ -92,7 +93,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Natural Language Admin Search Bar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
         <form onSubmit={handleNlSearch} className="flex gap-3">
           <div className="relative flex-1">
@@ -136,7 +136,6 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* AI Policy & Action Recommendations */}
       {aiInsights && (
         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/80 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -155,7 +154,6 @@ export default function AdminDashboard() {
             {aiInsights.summary || "No insights generated yet."}
           </p>
 
-          {/* Real aggregated numbers behind the advice */}
           {aiInsights.stats && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-center">
               {[
@@ -194,7 +192,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* City Map Overview */}
       <div className="space-y-2">
         <div className="flex justify-between items-center text-xs text-slate-500">
           <span>Complete city incident density & active hotspots</span>
@@ -207,7 +204,6 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Ward Cleanliness Index (ACI) Leaderboard */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <h3 className="font-bold text-slate-900 text-base mb-4">Ward Cleanliness Index (Swachh Index)</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -240,7 +236,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* AI-powered 48h hotspot overflow forecast */}
       {forecast && forecast.forecasts?.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-1">

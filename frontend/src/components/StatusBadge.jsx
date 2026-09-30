@@ -8,7 +8,6 @@ const statusConfigs = {
   RESOLVED: { label: 'Resolved (Pending Verification)', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
   CITIZEN_VERIFIED: { label: 'Citizen Verified ✓', bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300' },
   REOPENED: { label: 'Reopened', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
-  // Pickups
   REQUESTED: { label: 'Requested', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300' },
   SCHEDULED: { label: 'Scheduled', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
   COLLECTED: { label: 'Collected', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },

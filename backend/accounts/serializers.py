@@ -17,20 +17,21 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'email', 'password', 'first_name', 'last_name', 'role', 'phone', 'zone']
+        extra_kwargs = {'role': {'required': False}}
 
     def create(self, validated_data):
-        user = User.objects.create_user(
+        validated_data.pop('role', None)
+        return User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
             password=validated_data['password'],
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
-            role=validated_data.get('role', User.ROLE_CITIZEN),
+            role=User.ROLE_CITIZEN,
             phone=validated_data.get('phone', ''),
             zone=validated_data.get('zone', 'Zone 1 - Central'),
-            badges=['Waste Watcher'] if validated_data.get('role') == User.ROLE_CITIZEN else []
+            badges=['Waste Watcher'],
         )
-        return user
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
@@ -41,7 +42,6 @@ class LoginSerializer(serializers.Serializer):
         password = data.get('password')
         user = authenticate(username=username, password=password)
         if not user:
-            # Check by email as fallback
             try:
                 user_obj = User.objects.get(email=username)
                 user = authenticate(username=user_obj.username, password=password)

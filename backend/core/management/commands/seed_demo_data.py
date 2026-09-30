@@ -18,7 +18,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("Starting SwachDrishti seed demo data process...")
 
-        # 1. Demo Users
         admin_user, _ = User.objects.get_or_create(
             username='admin',
             defaults={
@@ -110,7 +109,6 @@ class Command(BaseCommand):
 
         self.stdout.write("-> Seeded users (admin, supervisor, worker, citizen)")
 
-        # 2. Categories
         categories_data = [
             {'name': 'Overflowing bin', 'slug': 'overflowing-bin', 'icon': 'trash', 'color': '#059669', 'description': 'Public waste bin filled past capacity with surrounding spillage.', 'disposal_guide': 'Deposit into municipal mobile compactor or report for immediate high-capacity swap.'},
             {'name': 'Roadside dumping', 'slug': 'roadside-dumping', 'icon': 'alert-circle', 'color': '#D97706', 'description': 'Unsanctioned trash heap along pedestrian sidewalk or curb.', 'disposal_guide': 'Clear using mechanical broom and transport to regional sorting depot.'},
@@ -127,12 +125,9 @@ class Command(BaseCommand):
             cat_map[c['name']] = obj
         self.stdout.write("-> Seeded waste categories")
 
-        # Base Coordinates (Delhi / Central NCR area for realistic visual clustering)
-        # 28.6139° N, 77.2090° E
         BASE_LAT = 28.6280
         BASE_LNG = 77.2180
 
-        # 3. Hotspots
         hotspot1, _ = Hotspot.objects.get_or_create(
             name='Mall Road Commercial Belt',
             defaults={
@@ -191,7 +186,6 @@ class Command(BaseCommand):
         )
         self.stdout.write("-> Seeded recurring hotspots")
 
-        # 4. Realistic Waste Reports
         now = timezone.now()
         reports_seed = [
             {
@@ -319,7 +313,6 @@ class Command(BaseCommand):
             created_reports.append(rep)
         self.stdout.write("-> Seeded waste reports with explainable priorities")
 
-        # 5. Evidence for the Resolved Report
         resolved_rep = created_reports[3]
         evidence, _ = Evidence.objects.get_or_create(
             report=resolved_rep,
@@ -331,7 +324,6 @@ class Command(BaseCommand):
             }
         )
 
-        # 6. Citizen Verification for the CITIZEN_VERIFIED report
         verified_rep = created_reports[4]
         CitizenVerification.objects.get_or_create(
             report=verified_rep,
@@ -342,7 +334,6 @@ class Command(BaseCommand):
             }
         )
 
-        # Reopen verification for the REOPENED report
         reopened_rep = created_reports[5]
         CitizenVerification.objects.get_or_create(
             report=reopened_rep,
@@ -354,7 +345,6 @@ class Command(BaseCommand):
             }
         )
 
-        # 7. Task Assignments for Sanitation Worker
         TaskAssignment.objects.get_or_create(
             report=created_reports[0],
             defaults={
@@ -377,7 +367,6 @@ class Command(BaseCommand):
         )
         self.stdout.write("-> Seeded worker task assignments")
 
-        # 8. Pickup Requests
         PickupRequest.objects.get_or_create(
             citizen=citizen1,
             waste_type='BULK',
@@ -411,7 +400,6 @@ class Command(BaseCommand):
         )
         self.stdout.write("-> Seeded pickup requests")
 
-        # 9. Collection Points with QR Codes
         CollectionPoint.objects.get_or_create(
             code='CP-MALL-01',
             defaults={
@@ -453,7 +441,6 @@ class Command(BaseCommand):
         )
         self.stdout.write("-> Seeded collection points & QR targets")
 
-        # 10. Awareness Waste Stream Guides
         streams = [
             {
                 'name': 'Wet Waste (Organic)',
@@ -526,7 +513,6 @@ class Command(BaseCommand):
             WasteStreamGuide.objects.get_or_create(slug=s['slug'], defaults=s)
         self.stdout.write("-> Seeded awareness waste stream guides")
 
-        # 11. Interactive Quiz Questions
         quizzes = [
             {
                 'question': 'Where should a used alkaline AA battery go?',
@@ -569,7 +555,6 @@ class Command(BaseCommand):
             QuizQuestion.objects.get_or_create(question=q['question'], defaults=q)
         self.stdout.write("-> Seeded interactive quiz questions")
 
-        # 12. Area Cleanliness Index
         AreaCleanlinessIndex.objects.get_or_create(
             zone='Zone 1 - Central',
             defaults={

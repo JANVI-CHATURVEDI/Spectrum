@@ -5,18 +5,12 @@ from reports.models import WasteReport
 from core.geo import haversine_distance
 
 def parse_natural_language_query(query: str) -> dict:
-    """
-    Parses natural language admin queries into safe structured query parameters
-    using Gemini function calling / structured output with strict ORM whitelisting,
-    falling back seamlessly to rule-based regex parsing.
-    """
     from .service import AIService
     
     q_str = (query or '').strip()
     explanation_parts = []
     source = 'regex_engine'
 
-    # Try Gemini structured output first
     gemini_filters = AIService.structured_search(q_str)
     if gemini_filters:
         source = 'gemini_function_calling'
@@ -54,7 +48,6 @@ def parse_natural_language_query(query: str) -> dict:
 
         qs = WasteReport.objects.filter(**orm_filters)
 
-        # Handle geo-radius filter if provided
         lat = gemini_filters.get('lat')
         lng = gemini_filters.get('lng')
         radius = gemini_filters.get('radius_meters', 500)
@@ -78,11 +71,9 @@ def parse_natural_language_query(query: str) -> dict:
             'source': source,
         }
 
-    # Robust Heuristic / Regex Fallback
     q = q_str.lower()
     filters = {}
     
-    # Priority matching
     if 'critical' in q:
         filters['priority_level'] = 'CRITICAL'
         explanation_parts.append("Filtered by priority: CRITICAL")
@@ -93,7 +84,6 @@ def parse_natural_language_query(query: str) -> dict:
         filters['priority_level'] = 'LOW'
         explanation_parts.append("Filtered by priority: LOW")
 
-    # Status matching
     if 'unresolved' in q or 'pending' in q or 'open' in q:
         filters['status__in'] = ['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'REOPENED']
         explanation_parts.append("Showing unresolved issues")
@@ -101,7 +91,6 @@ def parse_natural_language_query(query: str) -> dict:
         filters['status__in'] = ['RESOLVED', 'CITIZEN_VERIFIED']
         explanation_parts.append("Showing resolved issues")
 
-    # Category matching
     categories = {
         'bin': 'Overflowing bin',
         'overflow': 'Overflowing bin',
@@ -119,7 +108,6 @@ def parse_natural_language_query(query: str) -> dict:
             explanation_parts.append(f"Matching category '{cat_name}'")
             break
 
-    # Location / Area matching
     zones = ['zone 1', 'zone 2', 'zone 3', 'zone 4', 'mall road', 'civil lines', 'market', 'station', 'school', 'hospital', 'connaught place', 'cp']
     for loc in zones:
         if loc in q:
@@ -127,12 +115,10 @@ def parse_natural_language_query(query: str) -> dict:
             explanation_parts.append(f"Near/within '{loc.title()}'")
             break
 
-    # Recurrence matching
     is_recurring_query = 'recurring' in q or 'hotspot' in q or 'repeated' in q
     if is_recurring_query:
         explanation_parts.append("Targeting recurring hotspot incidents")
 
-    # Execute safe query on WasteReport
     qs = WasteReport.objects.filter(**filters)
     if is_recurring_query:
         qs = qs.filter(priority_factors__icontains='recurring')

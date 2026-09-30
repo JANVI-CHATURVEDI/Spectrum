@@ -15,7 +15,7 @@ class HotspotViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        qs = Hotspot.objects.all()
+        qs = Hotspot.objects.select_related('dominant_category').all()
         zone = self.request.query_params.get('zone')
         status_param = self.request.query_params.get('status')
         if zone:
@@ -25,9 +25,6 @@ class HotspotViewSet(viewsets.ModelViewSet):
         return qs
 
 class HotspotPredictionView(APIView):
-    """
-    Returns AI predictive forecasting for recurring hotspots likely to overflow within 48h.
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -40,10 +37,6 @@ class HotspotPredictionView(APIView):
         })
 
 class DetectHotspotsView(APIView):
-    """
-    Scans recent reports and aggregates density clusters into recurring hotspots.
-    Uses bounding-box prefiltering to avoid O(N^2) overhead.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -52,11 +45,10 @@ class DetectHotspotsView(APIView):
         existing_hotspots = list(Hotspot.objects.all())
         
         clusters_found = 0
-        lat_step = radius / 111320.0  # Approx meters to latitude degrees
+        lat_step = radius / 111320.0
 
         for r in reports:
             lon_step = radius / (111320.0 * max(0.1, math.cos(math.radians(r.latitude))))
-            # Bounding box candidate prefilter
             nearby = [
                 other for other in reports
                 if abs(other.latitude - r.latitude) <= lat_step
@@ -65,7 +57,6 @@ class DetectHotspotsView(APIView):
             ]
 
             if len(nearby) >= 3:
-                # Check if hotspot already exists nearby using bounding box prefilter
                 existing = None
                 for h in existing_hotspots:
                     if abs(h.latitude - r.latitude) <= lat_step and abs(h.longitude - r.longitude) <= lon_step:

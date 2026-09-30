@@ -1,7 +1,3 @@
-"""
-URL Configuration for SwachDrishti.
-"""
-
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -27,5 +23,5 @@ urlpatterns = [
     path('api/ai/', include('ai_service.urls')),
 ]
 
-if settings.DEBUG:
+if settings.DEBUG or not getattr(settings, 'USE_NEON_OBJECT_STORAGE', False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

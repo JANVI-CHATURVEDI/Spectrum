@@ -13,7 +13,7 @@ class PickupRequestViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        qs = PickupRequest.objects.all()
+        qs = PickupRequest.objects.select_related('citizen', 'assigned_worker').all()
         status_param = self.request.query_params.get('status')
         zone_param = self.request.query_params.get('zone')
         my_pickups = self.request.query_params.get('my_pickups')
@@ -33,8 +33,6 @@ class PickupRequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         citizen = self.request.user if self.request.user.is_authenticated else User.objects.filter(role='CITIZEN').first()
         if citizen is None:
-            # PickupRequest.citizen is NOT NULL - never let an anonymous
-            # request on an unseeded DB blow up with an IntegrityError.
             citizen, _ = User.objects.get_or_create(
                 username='guest_citizen',
                 defaults={

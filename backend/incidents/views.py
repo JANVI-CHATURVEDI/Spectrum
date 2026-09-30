@@ -29,10 +29,7 @@ class IncidentViewSet(viewsets.ModelViewSet):
         return qs
 
 class SubmitEvidenceView(APIView):
-    """
-    Sanitation Worker uploads after-cleanup proof photo and completes the incident or report.
-    """
-    permission_classes = [AllowAny]  # Allow easy testing and worker action
+    permission_classes = [AllowAny]
 
     def post(self, request):
         incident_id = request.data.get('incident_id')
@@ -56,24 +53,26 @@ class SubmitEvidenceView(APIView):
 
         now = timezone.now()
 
-        # Update report status
         if report_id:
             try:
                 rep = WasteReport.objects.get(id=report_id)
                 rep.status = 'RESOLVED'
                 rep.resolved_at = now
                 rep.save(update_fields=['status', 'resolved_at'])
+                try:
+                    from core.notifications import notify_verification_required
+                    notify_verification_required(rep)
+                except Exception:
+                    pass
             except WasteReport.DoesNotExist:
                 pass
 
-        # Update incident status
         if incident_id:
             try:
                 inc = Incident.objects.get(id=incident_id)
                 inc.status = 'RESOLVED'
                 inc.resolved_at = now
                 inc.save(update_fields=['status', 'resolved_at'])
-                # Also mark all child reports as resolved
                 inc.reports.filter(status__in=['REPORTED', 'ASSIGNED', 'IN_PROGRESS']).update(
                     status='RESOLVED',
                     resolved_at=now
@@ -81,9 +80,6 @@ class SubmitEvidenceView(APIView):
             except Incident.DoesNotExist:
                 pass
 
-        # Update associated task assignments.
-        # Guarded: filtering on `report_id=None` would otherwise match EVERY
-        # incident-only assignment and mark unrelated work as completed.
         if report_id:
             TaskAssignment.objects.filter(
                 report_id=report_id,

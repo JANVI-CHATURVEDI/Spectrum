@@ -1,17 +1,15 @@
 import os
 import re
 import json
+import hashlib
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from django.conf import settings
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
 class AIService:
-    """
-    Pluggable AI Service layer for SwachDrishti.
-    Integrates with Google Gemini when GEMINI_API_KEY is available,
-    and seamlessly falls back to fast, robust rule-based algorithms.
-    """
     
     @classmethod
     def get_gemini_client(cls):
@@ -27,9 +25,6 @@ class AIService:
 
     @classmethod
     def classify_waste_and_severity(cls, description: str, filename: str = '') -> dict:
-        """
-        Classifies waste category, severity, and generates an executive summary.
-        """
         prompt_text = f"Text: {description} (file: {filename})"
         client = cls.get_gemini_client()
         
@@ -62,10 +57,8 @@ Do not include markdown code block formatting, just the raw JSON.
             except Exception as e:
                 logger.info(f"Gemini call fallback triggered: {e}")
 
-        # Robust Heuristic / Rule-based Fallback
         desc_lower = (description + ' ' + filename).lower()
         
-        # Categorization heuristics
         if any(w in desc_lower for w in ['bin', 'dustbin', 'overflow', 'spilling', 'container']):
             category = 'Overflowing bin'
             severity = 'HIGH' if any(w in desc_lower for w in ['huge', 'blocking', 'street', 'foul', 'stink']) else 'MEDIUM'
@@ -91,7 +84,6 @@ Do not include markdown code block formatting, just the raw JSON.
             category = 'Mixed waste'
             severity = 'MEDIUM'
             
-        # Urgency modifiers
         if any(w in desc_lower for w in ['critical', 'urgent', 'drain', 'hospital', 'school', 'fire', 'hazard', 'toxic', 'smell', 'stench']):
             severity = 'CRITICAL'
 
@@ -109,12 +101,8 @@ Do not include markdown code block formatting, just the raw JSON.
 
     @classmethod
     def generate_operational_insights(cls, stats: dict) -> list[dict]:
-        """
-        Generates actionable municipal operational insights from current database metrics.
-        """
         insights = []
         
-        # 1. Hotspot recommendation
         hotspot_count = stats.get('active_hotspots_count', 0)
         if hotspot_count > 0:
             insights.append({
@@ -126,7 +114,6 @@ Do not include markdown code block formatting, just the raw JSON.
                 'action_label': 'View Hotspots'
             })
             
-        # 2. Category trend
         top_category = stats.get('top_category', 'Mixed waste')
         insights.append({
             'id': 2,
@@ -137,7 +124,6 @@ Do not include markdown code block formatting, just the raw JSON.
             'action_label': 'Launch Awareness'
         })
         
-        # 3. Zone demand
         top_zone = stats.get('top_pickup_zone', 'Zone 1 - Central')
         insights.append({
             'id': 3,
@@ -150,13 +136,9 @@ Do not include markdown code block formatting, just the raw JSON.
 
         return insights
 
-    # ------------------------------------------------------------------
-    # Phase 2 - advanced AI capabilities (Gemini with heuristic fallback)
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _extract_json(text):
-        """Tolerant JSON extraction from an LLM response."""
         text = (text or '').strip()
         if not text:
             return None
@@ -180,16 +162,9 @@ Do not include markdown code block formatting, just the raw JSON.
         cls, description: str = '', filename: str = '',
         image_bytes: bytes | None = None, mime_type: str = 'image/jpeg',
     ) -> dict:
-        """
-        Multimodal triage: photo + description -> category, severity,
-        estimated volume, hazard flags and a confidence score.
-        Falls back to the text-only heuristic when there is no API key,
-        no image, or the call fails.
-        """
         fallback = cls.classify_waste_and_severity(description, filename)
 
         if not image_bytes or not cls.has_gemini():
-            # Heuristic hazard flags so the UI contract is stable
             fallback.setdefault('hazard_flags', cls._heuristic_hazards(description))
             fallback.setdefault('estimated_volume', cls._heuristic_volume(description))
             fallback.setdefault('ai_suggested', False)
@@ -265,10 +240,6 @@ No markdown fences."""
 
     @classmethod
     def compare_cleanup(cls, before_bytes: bytes | None, after_bytes: bytes | None, notes: str = '') -> dict:
-        """
-        Compares a before photo with the worker's after photo.
-        Returns a 0-100 cleanup score plus an explanation.
-        """
         if before_bytes and after_bytes and cls.has_gemini():
             try:
                 from google.genai import types
@@ -302,7 +273,6 @@ No markdown fences."""
             except Exception as e:
                 logger.info(f"Gemini cleanup-compare fallback triggered: {e}")
 
-        # Fallback: any after-photo plus notes counts as partial evidence
         score = 55 if after_bytes else 0
         if notes and len(notes) > 20:
             score += 20
@@ -316,7 +286,6 @@ No markdown fences."""
 
     @classmethod
     def translate_description(cls, text: str) -> dict:
-        """Translate Hindi/Hinglish report text to English. No-op without a key."""
         if not text or not cls.has_gemini():
             return {'translated_text': '', 'detected_language': 'unknown', 'source': 'none'}
         try:
@@ -345,21 +314,22 @@ No markdown fences."""
             logger.info(f"Translation fallback triggered: {e}")
         return {'translated_text': '', 'detected_language': 'unknown', 'source': 'none'}
 
-    # Whitelisted keys a natural-language query may turn into ORM filters.
     SEARCH_WHITELIST = {
         'priority_level', 'status_in', 'category_icontains', 'zone',
         'address_icontains', 'min_age_hours', 'max_age_hours',
         'lat', 'lng', 'radius_meters',
     }
 
+    SEARCH_TIMEOUT = 8
+
     @classmethod
     def structured_search(cls, query: str) -> dict | None:
-        """
-        Gemini structured output -> validated filter dict.
-        Returns None so callers can fall back to the regex parser.
-        """
         if not query or not cls.has_gemini():
             return None
+        cache_key = 'ai_nlq:' + hashlib.md5(query.strip().lower().encode('utf-8')).hexdigest()
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached or None
         try:
             from google.genai import types
             client = cls.get_gemini_client()
@@ -382,18 +352,26 @@ No markdown fences."""
                 response_schema=schema,
                 temperature=0,
             )
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=(
-                    "Convert this civic query into search filters. Only include filters "
-                    f"the query actually implies.\nQuery: {query}"
-                ),
-                config=config,
-            )
+            executor = ThreadPoolExecutor(max_workers=1)
+            try:
+                future = executor.submit(
+                    client.models.generate_content,
+                    model='gemini-2.5-flash',
+                    contents=(
+                        "Convert this civic query into search filters. Only include filters "
+                        f"the query actually implies.\nQuery: {query}"
+                    ),
+                    config=config,
+                )
+                response = future.result(timeout=cls.SEARCH_TIMEOUT)
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
             data = cls._extract_json(response.text)
             if not isinstance(data, dict):
                 return None
             clean = {k: v for k, v in data.items() if k in cls.SEARCH_WHITELIST and v not in (None, '', [])}
+            if clean:
+                cache.set(cache_key, clean, 900)
             return clean or None
         except Exception as e:
             logger.info(f"Structured search fallback triggered: {e}")
@@ -401,10 +379,6 @@ No markdown fences."""
 
     @classmethod
     def write_insights(cls, stats: dict) -> dict:
-        """
-        LLM-authored recommendations built from REAL aggregated numbers.
-        Always returns the full structure; heuristic text when no API key.
-        """
         fallback_summary = (
             f"{stats.get('active_hotspots_count', 0)} active hotspots across "
             f"{stats.get('total_reports', 0)} reports. "

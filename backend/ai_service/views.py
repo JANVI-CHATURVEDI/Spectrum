@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import status as http_status
 from django.core.cache import cache
+from django.db.models import Count
 from django.utils import timezone
 from datetime import timedelta
 
@@ -14,30 +15,28 @@ from hotspots.models import Hotspot
 from core.forecast import forecast_hotspots
 from core.geo import haversine_distance
 
-# Values a natural-language filter may legally set - everything else is ignored.
 VALID_STATUS = {
     'REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS',
     'RESOLVED', 'CITIZEN_VERIFIED', 'REOPENED',
 }
 VALID_PRIORITY = {'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'}
 INSIGHTS_CACHE_KEY = 'swachdrishti:ai_insights'
-INSIGHTS_CACHE_TTL = 60 * 15  # 15 minutes
+INSIGHTS_CACHE_TTL = 60 * 15
+
+
+def _optimize(qs):
+    if not hasattr(qs, 'select_related'):
+        return qs
+    return qs.select_related(
+        'category', 'citizen', 'citizen_verification__citizen'
+    ).annotate(duplicates_count=Count('duplicates', distinct=True))
 
 
 def _serialize(qs):
-    # Accepts a queryset or an already-materialised list
-    if hasattr(qs, 'select_related'):
-        qs = qs.select_related('category', 'citizen')
-    return WasteReportSerializer(qs, many=True).data
+    return WasteReportSerializer(_optimize(qs), many=True).data
 
 
 class AIClassifyView(APIView):
-    """
-    Classifies a report from text and/or an uploaded photo.
-    Accepts JSON {text} or multipart form-data with an `image` file.
-    Always returns BOTH the legacy and `suggested_*` key styles plus
-    `ai_suggested` so the UI can render an override badge.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -60,7 +59,6 @@ class AIClassifyView(APIView):
             mime_type=mime_type,
         )
 
-        # Multilingual: Hindi/Hinglish descriptions get translated too
         translation = AIService.translate_description(description) if description else {}
         translated = (translation or {}).get('translated_text', '')
 
@@ -86,14 +84,6 @@ class AIClassifyView(APIView):
 
 
 class NLAdminSearchView(APIView):
-    """
-    Natural-language search for the Admin Command Center.
-    GET ?q=... and POST {query} are both supported.
-
-    Order of preference:
-      1. Gemini structured output (validated against a whitelist)
-      2. deterministic regex parser
-    """
     permission_classes = [AllowAny]
 
     def _run(self, query):
@@ -110,12 +100,14 @@ class NLAdminSearchView(APIView):
             explanation = parsed.get('explanation', '')
             filters = self._regex_to_filters(parsed.get('structured_filters', {}))
 
-        rows = list(qs.order_by('-priority_score', '-created_at')[:30])
+        rows = list(_optimize(qs).order_by('-priority_score', '-created_at')[:30])
+        payload = WasteReportSerializer(rows, many=True).data
         return {
             'query': query,
-            'results': _serialize(rows),
-            'reports': _serialize(rows),
-            'matched_count': len(rows),
+            'results': payload,
+            'reports': payload,
+            'report_ids': [r['id'] for r in payload],
+            'matched_count': len(payload),
             'structured_filters': {k: str(v) for k, v in filters.items()},
             'explanation': explanation,
             'source': source,
@@ -123,7 +115,6 @@ class NLAdminSearchView(APIView):
 
     @staticmethod
     def _apply_whitelisted(f: dict):
-        """Translate only whitelisted keys into ORM lookups. Nothing else passes."""
         qs = WasteReport.objects.all()
 
         if f.get('priority_level') in VALID_PRIORITY:
@@ -147,7 +138,6 @@ class NLAdminSearchView(APIView):
             except (TypeError, ValueError):
                 pass
 
-        # Radius: bounding-box prefilter first, then exact haversine
         try:
             lat, lng, radius = float(f['lat']), float(f['lng']), float(f['radius_meters'] or 2000)
         except (KeyError, TypeError, ValueError):
@@ -158,7 +148,6 @@ class NLAdminSearchView(APIView):
             latitude__gte=lat - deg, latitude__lte=lat + deg,
             longitude__gte=lng - deg * 1.4, longitude__lte=lng + deg * 1.4,
         )
-        # Exact pass, but keep returning a queryset so callers can order/slice
         matched_ids = [
             r.id for r in qs
             if haversine_distance(lat, lng, r.latitude, r.longitude) <= radius
@@ -167,7 +156,6 @@ class NLAdminSearchView(APIView):
 
     @staticmethod
     def _regex_to_filters(raw: dict) -> dict:
-        """Normalise the regex parser's Django-style keys for display only."""
         out = {}
         for key, value in (raw or {}).items():
             out[key.replace('__in', '').replace('__icontains', '')] = value
@@ -183,10 +171,6 @@ class NLAdminSearchView(APIView):
 
 
 class AIInsightsView(APIView):
-    """
-    Recommendations written by the LLM from REAL aggregated database numbers,
-    cached for 15 minutes.
-    """
     permission_classes = [AllowAny]
 
     @staticmethod
@@ -277,10 +261,6 @@ class AIInsightsView(APIView):
 
 
 class CleanupVerifyView(APIView):
-    """
-    Compares the worker's after-photo against the report's before-photo with
-    Gemini and returns a cleanup-verified score for the supervisor.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -306,10 +286,6 @@ class CleanupVerifyView(APIView):
 
 
 class HotspotForecastView(APIView):
-    """
-    "Likely to overflow in the next 48h" with a plain-English explanation.
-    Pure time-series/density maths - no LLM, so it always works.
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):

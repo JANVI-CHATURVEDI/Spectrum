@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, Q, F, ExpressionWrapper, DurationField
 
 from reports.models import WasteReport, WasteCategory
 from pickups.models import PickupRequest
@@ -13,55 +13,45 @@ from .models import AreaCleanlinessIndex
 from .serializers import AreaCleanlinessIndexSerializer
 
 class CityOverviewMetricsView(APIView):
-    """
-    Overview KPI metrics for the Admin Command Center and Municipal Leadership.
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):
         now = timezone.now()
-        
-        # Reports counts
-        total_reports = WasteReport.objects.count()
-        active_reports = WasteReport.objects.filter(
-            status__in=['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'REOPENED']
-        ).count()
-        critical_issues = WasteReport.objects.filter(
-            priority_level='CRITICAL',
-            status__in=['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'REOPENED']
-        ).count()
-        resolved_reports = WasteReport.objects.filter(
-            status__in=['RESOLVED', 'CITIZEN_VERIFIED']
-        ).count()
-        
-        # Pickups counts
+
+        ACTIVE = ['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'REOPENED']
+        RESOLVED = ['RESOLVED', 'CITIZEN_VERIFIED']
+
+        report_stats = WasteReport.objects.aggregate(
+            total_reports=Count('id'),
+            active_reports=Count('id', filter=Q(status__in=ACTIVE)),
+            critical_issues=Count('id', filter=Q(priority_level='CRITICAL', status__in=ACTIVE)),
+            resolved_reports=Count('id', filter=Q(status__in=RESOLVED)),
+            avg_time=Avg(
+                ExpressionWrapper(
+                    F('resolved_at') - F('created_at'), output_field=DurationField()
+                ),
+                filter=Q(status__in=RESOLVED, resolved_at__isnull=False),
+            ),
+        )
+        total_reports = report_stats['total_reports']
+        active_reports = report_stats['active_reports']
+        critical_issues = report_stats['critical_issues']
+        resolved_reports = report_stats['resolved_reports']
+
         pending_pickups = PickupRequest.objects.filter(
             status__in=['REQUESTED', 'SCHEDULED', 'ASSIGNED', 'IN_PROGRESS']
         ).count()
-        
-        # Hotspots
+
         recurring_hotspots = Hotspot.objects.filter(status='ACTIVE').count()
-        
-        # Resolution Rate
+
         rate = round((resolved_reports / total_reports * 100), 1) if total_reports > 0 else 88.5
-        
-        # Active workers count
+
         from accounts.models import User
         active_workers = User.objects.filter(role=User.ROLE_WORKER, is_active=True).count() or 8
 
-        # Average turnaround calculation
-        from django.db.models import F, ExpressionWrapper, DurationField
-        resolved_with_time = WasteReport.objects.filter(
-            status__in=['RESOLVED', 'CITIZEN_VERIFIED'],
-            resolved_at__isnull=False
-        ).annotate(
-            duration=ExpressionWrapper(F('resolved_at') - F('created_at'), output_field=DurationField())
-        ).aggregate(avg_time=Avg('duration'))
-        
         avg_hours = 4.2
-        if resolved_with_time.get('avg_time'):
-            total_sec = resolved_with_time['avg_time'].total_seconds()
-            avg_hours = round(total_sec / 3600.0, 1)
+        if report_stats.get('avg_time'):
+            avg_hours = round(report_stats['avg_time'].total_seconds() / 3600.0, 1)
 
         return Response({
             'critical_issues': critical_issues,
@@ -79,15 +69,11 @@ class CityOverviewMetricsView(APIView):
         })
 
 class CleanlinessIndexView(APIView):
-    """
-    Spectrum Area Cleanliness Index broken down by transparent, explainable metrics.
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):
         indexes = AreaCleanlinessIndex.objects.all()
         if not indexes.exists():
-            # Seed default zones if empty
             defaults = [
                 {'zone': 'Zone 1 - Central', 'score': 84.5, 'grade': 'A', 'report_frequency_score': 82.0, 'resolution_speed_score': 86.0, 'recurrence_prevention_score': 78.0, 'pickup_reliability_score': 95.0, 'citizen_satisfaction_score': 89.0},
                 {'zone': 'Zone 2 - North Commercial', 'score': 76.0, 'grade': 'B+', 'report_frequency_score': 71.0, 'resolution_speed_score': 80.0, 'recurrence_prevention_score': 68.0, 'pickup_reliability_score': 88.0, 'citizen_satisfaction_score': 81.0},
@@ -113,18 +99,13 @@ class CleanlinessIndexView(APIView):
         })
 
 class AnalyticsChartsDataView(APIView):
-    """
-    Structured trend and category distribution datasets for charts.
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # 7-day trend
         days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         reported_trend = [14, 19, 22, 17, 26, 31, 24]
         resolved_trend = [12, 18, 20, 19, 24, 28, 25]
 
-        # Category distribution
         categories = WasteCategory.objects.annotate(report_count=Count('reports')).values('name', 'report_count', 'color')
         cat_data = [
             {'name': c['name'], 'count': max(c['report_count'], 1), 'color': c['color']}
@@ -154,10 +135,6 @@ class AnalyticsChartsDataView(APIView):
         })
 
 class PublicTransparencyView(APIView):
-    """
-    Public portal data - completely stripped of PII, personal phone numbers, or private addresses.
-    Section 17: 'Your city's waste picture.'
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -185,7 +162,6 @@ class PublicTransparencyView(APIView):
         active = WasteReport.objects.filter(status__in=['REPORTED', 'ASSIGNED', 'IN_PROGRESS']).count()
         pct = round(resolved / total * 100) if total else 0
 
-        # Real average resolution time (no hardcoded stats)
         secs = count = 0
         for created, done in WasteReport.objects.filter(
             resolved_at__isnull=False
@@ -196,7 +172,6 @@ class PublicTransparencyView(APIView):
         avg_resolution = f"{secs / count / 3600:.1f} hours" if count else "Not enough data"
 
         return Response({
-            # Flat keys read by PublicTransparency.jsx
             'total_reports_count': total,
             'resolved_percentage': f'{pct}%',
             'resolved_reports_count': resolved,

@@ -15,8 +15,6 @@ class PickupRequestSerializer(serializers.ModelSerializer):
             'preferred_slot', 'preferred_time', 'scheduled_date', 'status', 'assigned_worker',
             'assigned_worker_details', 'created_at', 'updated_at', 'completed_at'
         ]
-        # `citizen`/`assigned_worker` are resolved server-side in
-        # perform_create, so anonymous demo clients must not have to send them.
         read_only_fields = ['id', 'created_at', 'updated_at', 'citizen', 'assigned_worker']
 
     def to_internal_value(self, data):

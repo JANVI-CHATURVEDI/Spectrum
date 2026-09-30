@@ -1,12 +1,32 @@
 import React from 'react';
-import { Eye, Heart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Eye } from 'lucide-react';
+
+const PORTALS = [
+  { tab: 'citizen', path: '/citizen', label: 'Citizen Report & Track' },
+  { tab: 'worker', path: '/worker', label: 'Sanitation Route App' },
+  { tab: 'supervisor', path: '/supervisor', label: 'Supervisor Operations' },
+  { tab: 'admin', path: '/admin', label: 'Admin Command Center' },
+];
+
+const LEARN = [
+  { tab: 'public', path: '/public', label: "Your City's Waste Picture" },
+  { tab: 'awareness', path: '/awareness', label: 'Know Your Waste Guide' },
+  { tab: 'awareness', path: '/awareness', label: 'Segregation Quiz' },
+];
 
 export default function Footer({ setActiveTab }) {
+  const navigate = useNavigate();
+
+  const go = (tab, path) => {
+    if (setActiveTab) setActiveTab(tab);
+    navigate(path);
+  };
+
   return (
     <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          {/* Brand Col */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <img
@@ -33,23 +53,29 @@ export default function Footer({ setActiveTab }) {
             </div>
           </div>
 
-          {/* Quick links */}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-200 mb-3">Operational Portals</h4>
             <ul className="space-y-2 text-xs">
-              <li><button onClick={() => setActiveTab('citizen')} className="hover:text-emerald-400 transition-colors">Citizen Report & Track</button></li>
-              <li><button onClick={() => setActiveTab('worker')} className="hover:text-emerald-400 transition-colors">Sanitation Route App</button></li>
-              <li><button onClick={() => setActiveTab('supervisor')} className="hover:text-emerald-400 transition-colors">Supervisor Operations</button></li>
-              <li><button onClick={() => setActiveTab('admin')} className="hover:text-emerald-400 transition-colors">Admin Command Center</button></li>
+              {PORTALS.map(p => (
+                <li key={p.label}>
+                  <button onClick={() => go(p.tab, p.path)} className="hover:text-emerald-400 transition-colors">
+                    {p.label}
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
 
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-200 mb-3">Transparency & Learning</h4>
             <ul className="space-y-2 text-xs">
-              <li><button onClick={() => setActiveTab('public')} className="hover:text-emerald-400 transition-colors">Your City's Waste Picture</button></li>
-              <li><button onClick={() => setActiveTab('awareness')} className="hover:text-emerald-400 transition-colors">Know Your Waste Guide</button></li>
-              <li><button onClick={() => setActiveTab('awareness')} className="hover:text-emerald-400 transition-colors">Segregation Quiz</button></li>
+              {LEARN.map(p => (
+                <li key={p.label}>
+                  <button onClick={() => go(p.tab, p.path)} className="hover:text-emerald-400 transition-colors">
+                    {p.label}
+                  </button>
+                </li>
+              ))}
               <li><span className="text-slate-500">Spectrum Cleanliness Index</span></li>
             </ul>
           </div>

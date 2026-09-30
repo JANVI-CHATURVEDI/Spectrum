@@ -38,10 +38,6 @@ class LoginView(APIView):
         })
 
 class DemoLoginView(APIView):
-    """
-    Convenient, reliable demo login endpoint for hackathon evaluation.
-    Allowed roles: 'admin', 'supervisor', 'worker', 'citizen'.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -56,7 +52,6 @@ class DemoLoginView(APIView):
         
         user = User.objects.filter(role=target_role).first()
         if not user:
-            # Fallback to create demo user if not seeded yet
             username = f"demo_{role_req}"
             user, created = User.objects.get_or_create(
                 username=username,

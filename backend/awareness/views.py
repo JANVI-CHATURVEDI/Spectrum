@@ -17,9 +17,6 @@ class QuizQuestionListView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
 class QuizAnswerCheckView(APIView):
-    """
-    Validates user selected quiz option, returns explanation and correctness.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request, pk):
@@ -52,10 +49,6 @@ class CollectionPointViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
 class QRCollectionPointLookupView(APIView):
-    """
-    Resolves a scanned QR code to pre-filled collection point location for instant reporting.
-    Section 19: 'A QR scan should open Report an issue at this location with location already known.'
-    """
     permission_classes = [AllowAny]
 
     def get(self, request, code):

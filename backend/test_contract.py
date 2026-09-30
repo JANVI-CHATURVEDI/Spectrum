@@ -1,11 +1,3 @@
-"""
-API contract tests - one per endpoint the React frontend actually calls.
-
-These exist so a frontend/backend contract drift (wrong URL, wrong method,
-wrong response key) fails CI instead of failing during a live demo.
-
-Run: python manage.py test test_contract
-"""
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -18,7 +10,6 @@ from awareness.models import QuizQuestion
 
 
 class ContractTestCase(TestCase):
-    """Shared fixtures for every contract test."""
 
     @classmethod
     def setUpTestData(cls):
@@ -95,7 +86,6 @@ class AuthContractTests(ContractTestCase):
         self.assertEqual(res.json()['user']['username'], 'contract_citizen')
 
     def test_workers_list_is_bare_array(self):
-        """Navbar/SupervisorDashboard does `workRes.data || []` - no pagination wrapper."""
         token = self.client.post(
             '/api/auth/login/',
             {'username': 'contract_supervisor', 'password': 'secret123'},
@@ -109,7 +99,6 @@ class AuthContractTests(ContractTestCase):
 
 class ReportsContractTests(ContractTestCase):
     def test_report_list_lives_at_root(self):
-        """Frontend calls GET /api/reports/ (not /api/reports/incidents/)."""
         res = self.client.get('/api/reports/')
         self.assertEqual(res.status_code, 200)
         data = res.json()
@@ -117,6 +106,48 @@ class ReportsContractTests(ContractTestCase):
         self.assertEqual(len(rows), 1)
         self.assertIn('citizen_verification', rows[0])
         self.assertIn('category_details', rows[0])
+
+    def test_every_issue_is_visible_to_a_citizen(self):
+        for i in range(3):
+            WasteReport.objects.create(
+                citizen=None, category=self.category,
+                title=f'Other resident issue {i}', latitude=28.64 + i * 0.001,
+                longitude=77.22, address=f'Road {i}',
+            )
+        token = self.client.post(
+            '/api/auth/login/',
+            {'username': 'contract_citizen', 'password': 'secret123'},
+        ).json()['token']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        rows = self.client.get('/api/reports/').json()['results']
+        self.assertEqual(len(rows), 4)
+
+        mine = self.client.get('/api/reports/?my_reports=1').json()['results']
+        self.assertEqual(len(mine), 1)
+        self.assertEqual(mine[0]['citizen'], self.citizen.pk)
+
+    def test_uploaded_photo_gets_a_public_url(self):
+        import io
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buf = io.BytesIO()
+        Image.new('RGB', (8, 8), (16, 185, 129)).save(buf, format='JPEG')
+        res = self.client.post('/api/reports/', {
+            'title': 'with photo', 'description': 'see image',
+            'category': self.category.id, 'severity': 'LOW',
+            'latitude': 28.65, 'longitude': 77.23, 'address': 'Photo Road',
+            'image': SimpleUploadedFile('pile.jpg', buf.getvalue(),
+                                        content_type='image/jpeg'),
+        })
+        self.assertEqual(res.status_code, 201, res.json())
+        body = res.json()
+        self.assertTrue(body['image'], 'image field should hold the stored URL')
+        self.assertTrue(body['image_url'], 'image_url must be synced by save()')
+        self.assertTrue(body['image_url'].startswith('http'))
+        self.assertNotIn('X-Amz-Signature', body['image_url'],
+                         'stored URLs must be stable, not presigned')
+        self.assertEqual(body['image'], body['image_url'])
 
     def test_legacy_incidents_alias_still_works(self):
         res = self.client.get('/api/reports/incidents/')
@@ -128,7 +159,6 @@ class ReportsContractTests(ContractTestCase):
         self.assertIsInstance(res.json(), list)
 
     def test_check_duplicate_get_and_post(self):
-        """Frontend uses GET with query params; response key is nearby_incidents."""
         for res in (
             self.client.get('/api/reports/check-duplicate/?latitude=28.628&longitude=77.218'),
             self.client.post('/api/reports/check-duplicate/', {
@@ -189,7 +219,6 @@ class PickupsContractTests(ContractTestCase):
         )
 
     def test_anonymous_pickup_never_500s(self):
-        """PickupRequest.citizen is NOT NULL - anonymous create must not IntegrityError."""
         PickupRequest.objects.all().delete()
         res = self.client.post('/api/pickups/', {
             'waste_type': 'BULK', 'address': 'Nowhere', 'latitude': 1.0,
@@ -218,7 +247,6 @@ class OperationsContractTests(ContractTestCase):
         )
 
     def test_task_list_exposes_nested_report_details(self):
-        """WorkerDashboard reads task.report_details (not the bare FK id)."""
         token = self.client.post(
             '/api/auth/login/',
             {'username': 'contract_worker', 'password': 'secret123'},
@@ -248,7 +276,6 @@ class OperationsContractTests(ContractTestCase):
         self.assertEqual(res.json()['task']['status'], 'IN_PROGRESS')
 
     def test_team_summary_shape(self):
-        """SupervisorDashboard reads total_workers / in_progress_tasks / workers_status."""
         res = self.client.get('/api/operations/team-summary/')
         self.assertEqual(res.status_code, 200)
         body = res.json()
@@ -262,7 +289,6 @@ class OperationsContractTests(ContractTestCase):
 
 class AnalyticsContractTests(ContractTestCase):
     def test_overview_aliases(self):
-        """AdminDashboard reads resolved_reports_count / average_resolution_hours."""
         res = self.client.get('/api/analytics/overview/')
         self.assertEqual(res.status_code, 200)
         body = res.json()
@@ -271,7 +297,6 @@ class AnalyticsContractTests(ContractTestCase):
             self.assertIn(key, body)
 
     def test_cleanliness_index_returns_zones_array(self):
-        """AdminDashboard does data.zones and reads ward_name / resolution_rate."""
         res = self.client.get('/api/analytics/cleanliness-index/')
         self.assertEqual(res.status_code, 200)
         zones = res.json()['zones']
@@ -288,7 +313,6 @@ class AnalyticsContractTests(ContractTestCase):
         self.assertIn('categories', res.json())
 
     def test_transparency_alias_and_flat_keys(self):
-        """PublicTransparency reads /api/analytics/transparency/ + flat counters."""
         for url in ('/api/analytics/transparency/', '/api/analytics/public/'):
             res = self.client.get(url)
             self.assertEqual(res.status_code, 200, url)
@@ -296,7 +320,6 @@ class AnalyticsContractTests(ContractTestCase):
             self.assertIn('total_reports_count', body)
             self.assertIn('resolved_percentage', body)
             self.assertIn('summary', body)
-            # PII must never appear in the public payload
             self.assertNotIn('citizen_details', str(body))
             self.assertNotIn('email', str(body))
 
@@ -335,7 +358,6 @@ class AwarenessContractTests(ContractTestCase):
 
 class AIContractTests(ContractTestCase):
     def test_classify_accepts_text_and_returns_both_key_styles(self):
-        """Frontend posts {text} and reads suggested_severity / suggested_category_name."""
         res = self.client.post('/api/ai/classify/', {
             'text': 'huge overflowing dustbin blocking the road with foul stench',
             'latitude': 28.6, 'longitude': 77.2,
@@ -349,7 +371,6 @@ class AIContractTests(ContractTestCase):
         self.assertIn(body['suggested_severity'], ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
 
     def test_nl_search_get_with_q(self):
-        """AdminDashboard does GET /api/ai/search/?q=... and reads .results."""
         res = self.client.get('/api/ai/search/?q=critical unresolved')
         self.assertEqual(res.status_code, 200)
         self.assertIn('results', res.json())
@@ -361,7 +382,6 @@ class AIContractTests(ContractTestCase):
         self.assertIn('results', res.json())
 
     def test_insights_exposes_summary(self):
-        """AdminDashboard reads aiInsights.summary."""
         res = self.client.get('/api/ai/insights/')
         self.assertEqual(res.status_code, 200)
         body = res.json()
@@ -371,12 +391,14 @@ class AIContractTests(ContractTestCase):
         self.assertIsInstance(body['insights'], list)
         self.assertIn('actions', body)
         self.assertIn('stats', body)
-        # Recommendations must cite real aggregated numbers, not lorem ipsum
         for key in ('total_reports', 'active_reports', 'reports_this_week',
                     'avg_resolution_hours', 'overdue_reports', 'top_category'):
             self.assertIn(key, body['stats'])
 
     def test_insights_are_cached_for_15_minutes(self):
+        from django.core.cache import cache
+        from ai_service.views import INSIGHTS_CACHE_KEY
+        cache.delete(INSIGHTS_CACHE_KEY)
         first = self.client.get('/api/ai/insights/').json()
         second = self.client.get('/api/ai/insights/').json()
         self.assertFalse(first['cached'])
@@ -384,7 +406,6 @@ class AIContractTests(ContractTestCase):
         self.assertEqual(first['summary'], second['summary'])
 
     def test_classify_with_uploaded_photo(self):
-        """Multipart classify (photo triage) must degrade gracefully."""
         from django.core.files.uploadedfile import SimpleUploadedFile
         image = SimpleUploadedFile('pile.jpg', b'\xff\xd8\xff\xe0notreallyajpeg',
                                    content_type='image/jpeg')
@@ -401,7 +422,6 @@ class AIContractTests(ContractTestCase):
         self.assertIn('source', body)
 
     def test_verify_cleanup_endpoint(self):
-        """Supervisor before/after audit returns a 0-100 score, never a 500."""
         res = self.client.post('/api/ai/verify-cleanup/', {
             'report_id': self.report.pk,
             'notes': 'removed the entire pile and swept the footpath clean',
@@ -415,7 +435,6 @@ class AIContractTests(ContractTestCase):
         self.assertIn('source', body)
 
     def test_forecast_never_needs_the_llm(self):
-        """Forecast is pure maths - it must work with no API key at all."""
         res = self.client.get('/api/ai/forecast/')
         self.assertEqual(res.status_code, 200)
         body = res.json()
@@ -445,7 +464,6 @@ class IncidentsContractTests(ContractTestCase):
         self.assertEqual(self.report.status, 'RESOLVED')
 
     def test_evidence_submit_does_not_complete_unrelated_tasks(self):
-        """report_id given + incident_id omitted must not close other NULL-incident tasks."""
         other_report = WasteReport.objects.create(
             category=self.category, title='other', latitude=1.0, longitude=1.0,
             address='Elsewhere',

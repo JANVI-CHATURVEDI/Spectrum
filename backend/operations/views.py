@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.utils import timezone
+from django.db.models import Count, Q
 from datetime import timedelta
 
 from .models import TaskAssignment
@@ -20,12 +21,15 @@ class TaskAssignmentViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        qs = TaskAssignment.objects.all()
+        qs = TaskAssignment.objects.select_related(
+            'worker', 'supervisor', 'incident', 'pickup',
+            'report', 'report__category', 'report__citizen',
+            'report__citizen_verification',
+        ).prefetch_related('report__duplicates').all()
         worker_id = self.request.query_params.get('worker_id')
         status_param = self.request.query_params.get('status')
         priority_param = self.request.query_params.get('priority')
         
-        # If logged-in worker, filter by their user ID
         if self.request.user.is_authenticated and self.request.user.role == 'WORKER' and not worker_id:
             qs = qs.filter(worker=self.request.user)
         elif worker_id:
@@ -39,9 +43,6 @@ class TaskAssignmentViewSet(viewsets.ModelViewSet):
         return qs
 
 class AssignTaskView(APIView):
-    """
-    Supervisor or Admin assigns a report/incident/pickup to a sanitation worker.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -59,7 +60,6 @@ class AssignTaskView(APIView):
         supervisor = request.user if request.user.is_authenticated else None
         priority_level = 'HIGH'
 
-        # Update report status
         if report_id:
             try:
                 rep = WasteReport.objects.get(id=report_id)
@@ -69,7 +69,6 @@ class AssignTaskView(APIView):
             except WasteReport.DoesNotExist:
                 return Response({'error': 'Report not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Update incident status
         if incident_id:
             try:
                 inc = Incident.objects.get(id=incident_id)
@@ -79,7 +78,6 @@ class AssignTaskView(APIView):
             except Incident.DoesNotExist:
                 return Response({'error': 'Incident not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Update pickup status
         if pickup_id:
             try:
                 pick = PickupRequest.objects.get(id=pickup_id)
@@ -106,9 +104,6 @@ class AssignTaskView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 class TransitionTaskStatusView(APIView):
-    """
-    Worker starts or progresses a task.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request, pk):
@@ -150,7 +145,6 @@ class TransitionTaskStatusView(APIView):
                 elif after_image_url:
                     task.report.after_image_url = after_image_url
 
-                # AI cleanup verification comparison
                 from ai_service.service import AIService
                 before_bytes = None
                 if task.report.image:
@@ -172,7 +166,6 @@ class TransitionTaskStatusView(APIView):
                 task.report.cleanup_verdict = verification_res.get('verdict', 'Cleanup verified by worker evidence')
                 task.report.save()
 
-                # Also log to Evidence model
                 from incidents.models import Evidence
                 Evidence.objects.create(
                     report=task.report,
@@ -193,32 +186,49 @@ class TransitionTaskStatusView(APIView):
                 task.pickup.save(update_fields=['status', 'completed_at'])
 
         task.save()
+
+        if new_status == 'COMPLETED' and task.report:
+            try:
+                from core.notifications import notify_verification_required
+                notify_verification_required(task.report)
+            except Exception:
+                pass
+
         return Response({
             'message': f'Task status updated to {new_status}.',
             'task': TaskAssignmentSerializer(task).data
         })
 
 class SupervisorTeamSummaryView(APIView):
-    """
-    Supervisor view summarizing worker workload, active dispatches, and overdue incidents.
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):
-        workers = User.objects.filter(role='WORKER')
+        workers = list(User.objects.filter(role='WORKER'))
         team_stats = []
 
         now = timezone.now()
         overdue_threshold = now - timedelta(hours=6)
 
+        stats_by_worker = {
+            row['worker_id']: row
+            for row in TaskAssignment.objects.filter(
+                worker_id__in=[w.id for w in workers]
+            ).values('worker_id').annotate(
+                total_tasks=Count('id'),
+                active_count=Count('id', filter=Q(status__in=['ASSIGNED', 'IN_PROGRESS'])),
+                completed_count=Count('id', filter=Q(status='COMPLETED')),
+                overdue_count=Count('id', filter=Q(
+                    status__in=['ASSIGNED', 'IN_PROGRESS'],
+                    assigned_at__lte=overdue_threshold,
+                )),
+            )
+        }
+
         for w in workers:
-            tasks = TaskAssignment.objects.filter(worker=w)
-            active_count = tasks.filter(status__in=['ASSIGNED', 'IN_PROGRESS']).count()
-            completed_count = tasks.filter(status='COMPLETED').count()
-            overdue_count = tasks.filter(
-                status__in=['ASSIGNED', 'IN_PROGRESS'],
-                assigned_at__lte=overdue_threshold
-            ).count()
+            s = stats_by_worker.get(w.id, {})
+            active_count = s.get('active_count', 0)
+            completed_count = s.get('completed_count', 0)
+            overdue_count = s.get('overdue_count', 0)
 
             team_stats.append({
                 'id': w.id,
@@ -227,7 +237,7 @@ class SupervisorTeamSummaryView(APIView):
                 'zone': w.zone or 'Central Ward',
                 'ward': w.zone or 'Central Ward',
                 'phone': w.phone,
-                'total_tasks': tasks.count(),
+                'total_tasks': s.get('total_tasks', 0),
                 'active_tasks': active_count,
                 'active_tasks_count': active_count,
                 'completed_today': completed_count,
@@ -235,19 +245,25 @@ class SupervisorTeamSummaryView(APIView):
                 'status': 'Busy' if active_count >= 3 else ('Available' if active_count == 0 else 'On Route')
             })
 
-        pending_incidents = WasteReport.objects.filter(status__in=['REPORTED', 'VERIFIED']).count()
-        overdue_incidents = WasteReport.objects.filter(
-            status__in=['REPORTED', 'ASSIGNED', 'IN_PROGRESS'],
-            created_at__lte=overdue_threshold
-        ).count()
-        in_progress_tasks = TaskAssignment.objects.filter(status='IN_PROGRESS').count()
-        completed_today = TaskAssignment.objects.filter(
-            status='COMPLETED',
-            completed_at__date=now.date()
-        ).count()
+        task_totals = TaskAssignment.objects.aggregate(
+            in_progress_tasks=Count('id', filter=Q(status='IN_PROGRESS')),
+            completed_today=Count('id', filter=Q(status='COMPLETED', completed_at__date=now.date())),
+        )
+        report_totals = WasteReport.objects.aggregate(
+            pending_incidents=Count('id', filter=Q(status__in=['REPORTED', 'VERIFIED'])),
+            overdue_incidents=Count('id', filter=Q(
+                status__in=['REPORTED', 'ASSIGNED', 'IN_PROGRESS'],
+                created_at__lte=overdue_threshold,
+            )),
+        )
+
+        pending_incidents = report_totals['pending_incidents']
+        overdue_incidents = report_totals['overdue_incidents']
+        in_progress_tasks = task_totals['in_progress_tasks']
+        completed_today = task_totals['completed_today']
 
         summary_data = {
-            'total_workers': workers.count(),
+            'total_workers': len(workers),
             'in_progress_tasks': in_progress_tasks,
             'pending_incidents': pending_incidents,
             'overdue_incidents': overdue_incidents,
@@ -255,7 +271,7 @@ class SupervisorTeamSummaryView(APIView):
         }
 
         return Response({
-            'total_workers': workers.count(),
+            'total_workers': len(workers),
             'in_progress_tasks': in_progress_tasks,
             'workers_status': team_stats,
             'team': team_stats,

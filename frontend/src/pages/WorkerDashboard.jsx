@@ -32,7 +32,6 @@ export default function WorkerDashboard() {
     fetchTasks();
   }, []);
 
-  // Live polling for worker task dispatch updates
   useEffect(() => {
     if (!liveUpdates) return;
     const interval = setInterval(() => {
@@ -78,11 +77,9 @@ export default function WorkerDashboard() {
     }
   };
 
-  // Helper to safely get nested report or pickup
   const getTaskReport = (t) => t.report_details || (typeof t.report === 'object' ? t.report : null);
   const getTaskPickup = (t) => t.pickup_details || (typeof t.pickup === 'object' ? t.pickup : null);
 
-  // Haversine distance in km
   const getDistanceKm = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -97,7 +94,6 @@ export default function WorkerDashboard() {
     return R * c;
   };
 
-  // Order assigned tasks by priority + nearest-neighbour distance
   const orderedTasks = useMemo(() => {
     if (!optimizeRoute || tasks.length <= 1) return tasks;
 
@@ -143,7 +139,6 @@ export default function WorkerDashboard() {
     return route;
   }, [tasks, optimizeRoute]);
 
-  // Coordinates array for Leaflet polyline
   const routePolyline = useMemo(() => {
     if (!optimizeRoute) return null;
     return orderedTasks
@@ -154,7 +149,6 @@ export default function WorkerDashboard() {
       .filter(Boolean);
   }, [orderedTasks, optimizeRoute]);
 
-  // Convert tasks to report markers for map
   const taskReports = orderedTasks
     .map((t, idx) => {
       const rep = getTaskReport(t);
@@ -172,7 +166,6 @@ export default function WorkerDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
       <div className="bg-gradient-to-r from-teal-700 to-slate-800 rounded-2xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
@@ -197,7 +190,6 @@ export default function WorkerDashboard() {
         </div>
       </div>
 
-      {/* Route Map Controls & Display */}
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white p-3.5 rounded-xl border border-slate-200">
           <div className="flex items-center gap-3 text-xs">
@@ -247,7 +239,6 @@ export default function WorkerDashboard() {
         />
       </div>
 
-      {/* Task List and Action Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -315,7 +306,6 @@ export default function WorkerDashboard() {
           </div>
         </div>
 
-        {/* Task Inspector & Control Card */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
           <h3 className="font-bold text-slate-900 text-base border-b border-slate-100 pb-3">Field Action Panel</h3>
 
@@ -331,7 +321,6 @@ export default function WorkerDashboard() {
                 </div>
               </div>
 
-              {/* Before Photo if available from report */}
               {getTaskReport(selectedTask)?.image_url && (
                 <div>
                   <div className="text-[11px] font-bold text-slate-700 mb-1">Citizen Before Photo:</div>
@@ -354,7 +343,6 @@ export default function WorkerDashboard() {
                 ></textarea>
               </div>
 
-              {/* Status Action Buttons */}
               <div className="space-y-3 pt-1">
                 {selectedTask.status === 'ASSIGNED' && (
                   <button

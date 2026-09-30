@@ -2,7 +2,7 @@ from django.db import models
 
 class AreaCleanlinessIndex(models.Model):
     zone = models.CharField(max_length=100, unique=True)
-    score = models.FloatField(default=82.5)  # 0 to 100
+    score = models.FloatField(default=82.5)
     grade = models.CharField(max_length=10, default='A')
     
     report_frequency_score = models.FloatField(default=85.0)

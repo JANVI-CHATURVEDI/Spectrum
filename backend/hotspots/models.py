@@ -22,7 +22,7 @@ class Hotspot(models.Model):
     
     incident_count = models.IntegerField(default=1)
     report_count = models.IntegerField(default=1)
-    trend_percentage = models.FloatField(default=0.0)  # e.g. +145%
+    trend_percentage = models.FloatField(default=0.0)
     
     dominant_category = models.ForeignKey(
         WasteCategory,

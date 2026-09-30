@@ -1,28 +1,21 @@
-"""
-Django settings for SwachDrishti project.
-"See the waste. Spark the action."
-"""
-
 import os
 from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env file
 load_dotenv(BASE_DIR / '.env')
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'swachdrishti-insecure-dev-secret-key-change-in-prod-2026')
 
-# SECURITY WARNING: don't run with debug turned on in production!
+if not os.getenv('DEBUG', 'True').lower() in ('true', '1', 't') and SECRET_KEY.startswith('swachdrishti-insecure-dev'):
+    raise RuntimeError('SECRET_KEY must be set to a strong random value when DEBUG is False.')
+
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '*').split(',') if host.strip()]
 
-# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -33,12 +26,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'storages',
     
-    # Third party apps
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
     
-    # SwachDrishti modular apps
     'accounts',
     'reports',
     'incidents',
@@ -84,9 +75,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 import sys
-# Database
-# Uses in-memory SQLite when running tests for high speed & isolation
-# Uses Neon PostgreSQL if DATABASE_URL is set; falls back to SQLite for local development
 if 'test' in sys.argv:
     DATABASES = {
         'default': {
@@ -97,7 +85,6 @@ if 'test' in sys.argv:
 else:
     DATABASE_URL = (os.getenv('DATABASE_URL') or '').strip()
     if DATABASE_URL:
-        # Neon refuses plain (non-SSL) connections - enforce sslmode unless already set
         if 'sslmode=' not in DATABASE_URL:
             DATABASE_URL += ('&' if '?' in DATABASE_URL else '?') + 'sslmode=require'
         DATABASES = {
@@ -111,36 +98,45 @@ else:
             }
         }
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-        'OPTIONS': {'min_length': 6},
+        'OPTIONS': {'min_length': 8},
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
 
-# Custom User Model
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+    X_FRAME_OPTIONS = 'DENY'
+
 AUTH_USER_MODEL = 'accounts.User'
 
-# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# ---- Where uploaded photos go -------------------------------------------
-# Neon Postgres stores rows, not binaries. When the branch's S3-compatible
-# bucket credentials are present, uploads go to Neon Object Storage so files
-# branch together with the database and survive Render's ephemeral disk.
-# Without them we fall back to local MEDIA_ROOT so dev never needs the network.
 AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', '').strip()
 AWS_S3_ENDPOINT_URL = os.getenv('AWS_ENDPOINT_URL_S3', '').strip()
 USE_NEON_OBJECT_STORAGE = bool(
@@ -154,11 +150,7 @@ if USE_NEON_OBJECT_STORAGE:
     AWS_S3_REGION_NAME = os.getenv('AWS_REGION', 'us-east-2')
     AWS_S3_USE_SSL = AWS_S3_ENDPOINT_URL.startswith('https://')
     AWS_S3_SIGNATURE_VERSION = 's3v4'
-    # Keep filenames unique rather than overwriting on re-upload
     AWS_S3_FILE_OVERWRITE = False
-    # Neon buckets are provisioned as public_read, so store *stable* URLs.
-    # image_url is persisted in Postgres - a presigned URL would expire in
-    # 1h and every photo in an old report would stop loading.
     AWS_DEFAULT_ACL = None
     AWS_QUERYSTRING_AUTH = False
     AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=3600'}
@@ -176,10 +168,8 @@ STORAGES = {
     },
 }
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
@@ -192,20 +182,33 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 50,
 }
 
-# CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL', 'True').lower() in ('true', '1', 't')
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL', 'True' if DEBUG else 'False').lower() in ('true', '1', 't')
 CORS_ALLOWED_ORIGINS = [
     origin.strip() for origin in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',') if origin.strip()
 ]
 
-# CSRF Trusted Origins
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',') if origin.strip()
 ]
 
-# AI Configuration (Gemini API with fallback)
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 
-# File Upload limits (10MB)
+EMAIL_BACKEND = (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if os.getenv('EMAIL_HOST', '').strip() else
+    'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587') or 587)
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'SwachDrishti <noreply@swachdrishti.gov>')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '').strip()
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '').strip()
+TWILIO_FROM_NUMBER = os.getenv('TWILIO_FROM_NUMBER', '').strip()
+
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760

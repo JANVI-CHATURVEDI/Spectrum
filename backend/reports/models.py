@@ -74,7 +74,6 @@ class WasteReport(models.Model):
     resolved_at = models.DateTimeField(null=True, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True)
     
-    # AI Cleanup Verification
     after_image = models.ImageField(upload_to='reports/after/%Y/%m/', null=True, blank=True)
     after_image_url = models.URLField(max_length=1000, blank=True, default='')
     cleanup_score = models.IntegerField(default=0)
@@ -99,13 +98,6 @@ class WasteReport(models.Model):
         return score
 
     def save(self, *args, **kwargs):
-        """
-        Keep the public URL fields in sync with whatever was uploaded.
-
-        The React app renders `image_url` / `after_image_url`, while uploads
-        arrive on the `image` / `after_image` FileFields - without this the
-        photo is stored but never appears anywhere in the UI.
-        """
         if self.image:
             try:
                 self.image_url = self.image.url

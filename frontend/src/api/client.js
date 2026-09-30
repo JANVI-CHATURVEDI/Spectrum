@@ -9,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Interceptor to inject Token if present
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('swachdrishti_token');
   if (token) {

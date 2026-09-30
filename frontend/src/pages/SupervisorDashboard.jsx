@@ -11,10 +11,9 @@ export default function SupervisorDashboard() {
   const [hotspots, setHotspots] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dispatch'); // 'dispatch' | 'verifications'
+  const [activeTab, setActiveTab] = useState('dispatch'); 
   const [liveUpdates, setLiveUpdates] = useState(true);
 
-  // Assignment Modal
   const [assignTarget, setAssignTarget] = useState(null);
   const [selectedWorkerId, setSelectedWorkerId] = useState('');
   const [assigning, setAssigning] = useState(false);
@@ -43,7 +42,6 @@ export default function SupervisorDashboard() {
     fetchSupervisorData();
   }, []);
 
-  // Live polling for supervisor incoming reports and updates
   useEffect(() => {
     if (!liveUpdates) return;
     const interval = setInterval(() => {
@@ -74,7 +72,6 @@ export default function SupervisorDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
@@ -97,7 +94,6 @@ export default function SupervisorDashboard() {
         </div>
       </div>
 
-      {/* Map View */}
       <div className="space-y-2">
         <div className="flex justify-between items-center text-xs text-slate-500">
           <span>Active ward overview with recurrent hotspot clusters</span>
@@ -111,7 +107,6 @@ export default function SupervisorDashboard() {
         />
       </div>
 
-      {/* Tab Switcher & Live Sync */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
         <div className="flex gap-2 text-xs font-bold">
           <button
@@ -154,10 +149,8 @@ export default function SupervisorDashboard() {
         </div>
       </div>
 
-      {/* Grid: Main Panel & Team Capacity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {activeTab === 'dispatch' ? (
-          /* Unassigned Reports Queue */
           <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-900 text-base">Unassigned & Priority Reports</h3>
@@ -193,7 +186,6 @@ export default function SupervisorDashboard() {
             </div>
           </div>
         ) : (
-          /* Cleanups & AI Verification Audit Panel */
           <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
               <div>
@@ -234,7 +226,7 @@ export default function SupervisorDashboard() {
                       </div>
                     )}
 
-                    {/* Before vs After photo comparison */}
+                    {}
                     <div className="grid grid-cols-2 gap-3 pt-1">
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold uppercase text-slate-500">Before (Citizen Report)</span>
@@ -262,7 +254,6 @@ export default function SupervisorDashboard() {
           </div>
         )}
 
-        {/* Worker Roster and Workload */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
           <h3 className="font-bold text-slate-900 text-base border-b border-slate-100 pb-3">Crew Workload Roster</h3>
           <div className="space-y-3">
@@ -283,7 +274,6 @@ export default function SupervisorDashboard() {
         </div>
       </div>
 
-      {/* Assignment Modal */}
       {assignTarget && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 animate-in fade-in">

@@ -3,13 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+  ::selection {
+    background: #a7f3d0;
+    color: #064e3b;
+  }
+  :focus-visible {
+    outline: 2px solid #10b981;
+    outline-offset: 2px;
+  }
 }
 
-/* Leaflet map custom styling */
 .leaflet-container {
   width: 100%;
   height: 100%;
@@ -25,7 +35,6 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* Glassmorphism and clean panels */
 .civic-card {
   @apply bg-white rounded-xl border border-slate-200 shadow-sm transition-all duration-200;
 }
@@ -34,7 +43,6 @@
   @apply hover:shadow-md hover:border-slate-300;
 }
 
-/* Subtle custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

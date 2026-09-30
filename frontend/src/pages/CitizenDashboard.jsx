@@ -6,6 +6,7 @@ import PriorityBadge from '../components/PriorityBadge';
 import { Plus, CheckCircle, RefreshCw, AlertTriangle, Sparkles, Navigation } from 'lucide-react';
 
 import { ChevronRight, X, MapPin, Camera } from 'lucide-react';
+import { EmptyState } from '../components/ui';
 
 export default function CitizenDashboard() {
   const [reports, setReports] = useState([]);
@@ -14,11 +15,10 @@ export default function CitizenDashboard() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Tab: 'reports' | 'pickups' | 'new-report' | 'new-pickup'
   const [viewTab, setViewTab] = useState('reports');
   const [openReport, setOpenReport] = useState(null);
+  const [brokenPhotoId, setBrokenPhotoId] = useState(null);
 
-  // Report Creation State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
@@ -32,13 +32,11 @@ export default function CitizenDashboard() {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Pickup Creation State
   const [pickupType, setPickupType] = useState('BULK');
   const [pickupVolume, setPickupVolume] = useState('MEDIUM');
   const [pickupAddress, setPickupAddress] = useState('');
   const [preferredTime, setPreferredTime] = useState('');
 
-  // Resolution verification state
   const [verifyingReport, setVerifyingReport] = useState(null);
   const [verifyFeedback, setVerifyFeedback] = useState('');
 
@@ -67,7 +65,6 @@ export default function CitizenDashboard() {
     fetchData();
   }, []);
 
-  // Quick Duplicate & AI Check when location or description changes
   const handleAiAssistance = async (customPhoto = null) => {
     const photoToUse = customPhoto || photo;
     if (!description && !title && !photoToUse) return;
@@ -110,7 +107,6 @@ export default function CitizenDashboard() {
 
   const handleLocationSelect = async (lat, lng) => {
     setCoords({ lat, lng });
-    // Check duplicates
     try {
       const dupRes = await api.get(`/api/reports/check-duplicate/?latitude=${lat}&longitude=${lng}&radius_meters=100`);
       const dup = dupRes.data?.existing_reports?.[0] || dupRes.data?.nearby_incidents?.[0];
@@ -122,6 +118,56 @@ export default function CitizenDashboard() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const [locating, setLocating] = useState(false);
+  const [gpsFix, setGpsFix] = useState(null);   
+  const [gpsError, setGpsError] = useState('');
+
+  const detectMyLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation is not supported by this browser.');
+      return;
+    }
+    setLocating(true);
+    setGpsError('');
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        setGpsFix({ lat: latitude, lng: longitude, accuracy, at: Date.now() });
+        setLocating(false);
+        handleLocationSelect(latitude, longitude);
+        if (!address.trim()) {
+          try {
+            const r = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+              { headers: { Accept: 'application/json' } }
+            );
+            const d = await r.json();
+            const a = d.address || {};
+            const pretty = [
+              [a.house_number, a.road].filter(Boolean).join(' '),
+              a.suburb || a.neighbourhood || a.hamlet,
+              a.city || a.town || a.village,
+            ].filter(Boolean).join(', ') || d.display_name;
+            if (pretty) setAddress(pretty.split(',').slice(0, 4).join(','));
+          } catch (e) {
+            console.warn('reverse geocode skipped', e);
+          }
+        }
+      },
+      (err) => {
+        setLocating(false);
+        setGpsError(
+          err.code === 1
+            ? 'Location permission denied. Allow it in your browser, or click the map instead.'
+            : err.code === 3
+              ? 'Location request timed out. Try again.'
+              : 'Could not get your location. Click the map to drop the pin instead.'
+        );
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
   };
 
   const handleReportSubmit = async (e) => {
@@ -194,7 +240,6 @@ export default function CitizenDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* Header Banner */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
@@ -221,7 +266,6 @@ export default function CitizenDashboard() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-slate-200 gap-4 text-sm font-semibold">
         <button
           onClick={() => setViewTab('reports')}
@@ -237,11 +281,27 @@ export default function CitizenDashboard() {
         </button>
       </div>
 
-      {/* Main Interactive Map */}
       <div className="space-y-2">
-        <div className="flex justify-between items-center text-xs text-slate-500">
+        <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-500">
           <span>Click on the map or drag the pin to choose an incident spot.</span>
-          <span className="font-medium text-slate-700">Recurring hotspots shown with red boundaries</span>
+          <div className="flex items-center gap-2">
+            {gpsFix && (
+              <span className="flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                LIVE · {gpsFix.lat.toFixed(5)}, {gpsFix.lng.toFixed(5)}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={detectMyLocation}
+              disabled={locating}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-white border border-emerald-300 px-2.5 py-1 rounded-lg hover:bg-emerald-50 disabled:opacity-60 transition"
+            >
+              <Navigation className={`w-3.5 h-3.5 ${locating ? 'animate-pulse' : ''}`} />
+              {locating ? 'Detecting…' : 'Detect my live location'}
+            </button>
+            <span className="font-medium text-slate-700 hidden sm:inline">Recurring hotspots shown with red boundaries</span>
+          </div>
         </div>
         <MapView
           height="420px"
@@ -253,7 +313,6 @@ export default function CitizenDashboard() {
         />
       </div>
 
-      {/* Form Modal / Overlay: New Waste Report */}
       {viewTab === 'new-report' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 sm:p-8 max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
@@ -330,7 +389,7 @@ export default function CitizenDashboard() {
               ></textarea>
             </div>
 
-            {/* Photo evidence upload - powers Gemini vision triage */}
+            {}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Photo Evidence <span className="font-normal text-slate-400">(optional, improves AI accuracy)</span>
@@ -412,7 +471,18 @@ export default function CitizenDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Location / Street Landmark</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">Location / Street Landmark</label>
+                  <button
+                    type="button"
+                    onClick={detectMyLocation}
+                    disabled={locating}
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 disabled:opacity-60 transition shrink-0"
+                  >
+                    <Navigation className={`w-3.5 h-3.5 ${locating ? 'animate-pulse' : ''}`} />
+                    {locating ? 'Detecting…' : 'Detect my live location'}
+                  </button>
+                </div>
                 <input
                   type="text"
                   placeholder="e.g. Near Metro Pillar 42"
@@ -420,6 +490,27 @@ export default function CitizenDashboard() {
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
+                {gpsFix && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      LIVE · {gpsFix.lat.toFixed(5)}, {gpsFix.lng.toFixed(5)}
+                    </span>
+                    <span className="text-slate-400">
+                      ±{Math.round(gpsFix.accuracy)}m · {new Date(gpsFix.at).toLocaleTimeString()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setGpsFix(null)}
+                      className="text-slate-400 hover:text-rose-600 font-bold"
+                    >
+                      clear
+                    </button>
+                  </div>
+                )}
+                {gpsError && (
+                  <div className="mt-1.5 text-[11px] text-rose-600 font-semibold">{gpsError}</div>
+                )}
               </div>
             </div>
 
@@ -444,7 +535,6 @@ export default function CitizenDashboard() {
         </div>
       )}
 
-      {/* Form Overlay: New Pickup Request */}
       {viewTab === 'new-pickup' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 animate-in fade-in">
           <div className="flex justify-between items-center mb-4">
@@ -528,7 +618,6 @@ export default function CitizenDashboard() {
         </div>
       )}
 
-      {/* Reports Listing Table */}
       {viewTab === 'reports' && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -544,8 +633,8 @@ export default function CitizenDashboard() {
                 key={r.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => setOpenReport(r)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenReport(r); } }}
+                onClick={() => { setBrokenPhotoId(null); setOpenReport(r); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setBrokenPhotoId(null); setOpenReport(r); } }}
                 title="Open issue details"
                 className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-emerald-50/40 focus:bg-emerald-50/60 focus:outline-none transition cursor-pointer group"
               >
@@ -565,7 +654,7 @@ export default function CitizenDashboard() {
                 <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
                   <PriorityBadge level={r.priority_level} score={r.priority_score} factors={r.priority_factors} />
 
-                  {/* Citizen Verification prompt if resolved */}
+                  {}
                   {r.status === 'RESOLVED' && !(r.citizen_verification || r.verification) && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setVerifyingReport(r); }}
@@ -587,13 +676,15 @@ export default function CitizenDashboard() {
               </div>
             ))}
             {reports.length === 0 && !loading && (
-              <div className="p-8 text-center text-sm text-slate-400">No reports submitted yet.</div>
+              <EmptyState
+                title="No reports yet"
+                sub="Be the first to flag a waste issue in your ward — it takes under a minute."
+              />
             )}
           </div>
         </div>
       )}
 
-      {/* Pickups Listing */}
       {viewTab === 'pickups' && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -616,13 +707,15 @@ export default function CitizenDashboard() {
               </div>
             ))}
             {pickups.length === 0 && !loading && (
-              <div className="p-8 text-center text-sm text-slate-400">No pickup requests found.</div>
+              <EmptyState
+                title="No pickup requests"
+                sub="Schedule a doorstep pickup and track the crew right here."
+              />
             )}
           </div>
         </div>
       )}
 
-      {/* Issue detail modal - every issue in the list is openable */}
       {openReport && (
         <div
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -632,17 +725,30 @@ export default function CitizenDashboard() {
             className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header / photo */}
             <div className="relative bg-slate-100">
-              {(openReport.image_url || openReport.image) ? (
+              {(openReport.image_url || openReport.image) && brokenPhotoId !== openReport.id ? (
                 <img
                   src={openReport.image_url || openReport.image}
                   alt={openReport.title}
                   className="w-full h-52 object-cover"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    const alt = openReport.image && openReport.image !== (openReport.image_url || openReport.image)
+                      ? openReport.image : '';
+                    if (alt && !el.dataset.triedFallback) {
+                      el.dataset.triedFallback = '1';
+                      el.src = alt;               
+                    } else {
+                      setBrokenPhotoId(openReport.id);   
+                    }
+                  }}
                 />
               ) : (
                 <div className="w-full h-36 flex items-center justify-center text-slate-400 text-xs font-semibold">
-                  <Camera className="w-5 h-5 mr-2" /> No photo attached
+                  <Camera className="w-5 h-5 mr-2" />
+                  {(openReport.image_url || openReport.image)
+                    ? 'Photo could not be loaded'
+                    : 'No photo attached'}
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent pointer-events-none" />
@@ -665,7 +771,6 @@ export default function CitizenDashboard() {
             </div>
 
             <div className="p-5 space-y-4 text-xs">
-              {/* Status + priority */}
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={openReport.status} />
                 <PriorityBadge
@@ -675,12 +780,10 @@ export default function CitizenDashboard() {
                 />
               </div>
 
-              {/* Description */}
               <p className="text-slate-700 leading-relaxed">
                 {openReport.description || 'No extended description was provided for this issue.'}
               </p>
 
-              {/* Location */}
               <div className="p-3 bg-slate-50 rounded-xl space-y-1.5">
                 <div className="flex items-start gap-1.5 text-slate-700 font-semibold">
                   <MapPin className="w-3.5 h-3.5 mt-0.5 text-emerald-600 shrink-0" />
@@ -692,7 +795,6 @@ export default function CitizenDashboard() {
                 </div>
               </div>
 
-              {/* Why this priority */}
               {Array.isArray(openReport.priority_factors) && openReport.priority_factors.length > 0 && (
                 <div>
                   <div className="font-bold text-slate-900 mb-1.5 flex items-center gap-1.5">
@@ -710,7 +812,6 @@ export default function CitizenDashboard() {
                 </div>
               )}
 
-              {/* Timeline */}
               <div className="grid grid-cols-2 gap-2 text-[11px]">
                 <div className="p-2 bg-slate-50 rounded-lg">
                   <div className="text-slate-400 uppercase font-bold text-[9px]">Reported</div>
@@ -734,7 +835,6 @@ export default function CitizenDashboard() {
                 )}
               </div>
 
-              {/* Duplicate / verification state */}
               {openReport.is_duplicate && (
                 <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
                   Flagged as a duplicate of another report nearby.
@@ -753,7 +853,6 @@ export default function CitizenDashboard() {
                 </div>
               ) : null}
 
-              {/* Actions */}
               <div className="flex justify-end gap-3 pt-1">
                 <button
                   onClick={() => setOpenReport(null)}
@@ -775,7 +874,6 @@ export default function CitizenDashboard() {
         </div>
       )}
 
-      {/* Verification Modal Dialog */}
       {verifyingReport && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">

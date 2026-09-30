@@ -2,6 +2,7 @@ from rest_framework import viewsets, generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.db.models import Count
 from django.utils import timezone
 from datetime import timedelta
 
@@ -18,11 +19,6 @@ class WasteCategoryListView(generics.ListAPIView):
     pagination_class = None
 
 class CheckDuplicateReportView(APIView):
-    """
-    Checks if a recent report exists near the specified coordinates.
-    Supports GET (query parameters) and POST (JSON body).
-    Allows citizens to join an existing incident or submit separately.
-    """
     permission_classes = [AllowAny]
 
     def _check_duplicates(self, request):
@@ -76,10 +72,14 @@ class CheckDuplicateReportView(APIView):
 class WasteReportViewSet(viewsets.ModelViewSet):
     queryset = WasteReport.objects.all()
     serializer_class = WasteReportSerializer
-    permission_classes = [AllowAny]  # Allow citizens, anonymous demos, and authenticated staff
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        qs = WasteReport.objects.select_related('category', 'citizen', 'citizen_verification').all()
+        qs = WasteReport.objects.select_related(
+            'category', 'citizen', 'citizen_verification__citizen'
+        ).annotate(
+            duplicates_count=Count('duplicates', distinct=True)
+        )
         status_param = self.request.query_params.get('status')
         priority_param = self.request.query_params.get('priority')
         category_param = self.request.query_params.get('category')
@@ -103,7 +103,6 @@ class WasteReportViewSet(viewsets.ModelViewSet):
         citizen = self.request.user if self.request.user.is_authenticated else None
         report = serializer.save(citizen=citizen)
         
-        # Calculate nearby reports in 150m radius
         nearby_count = 0
         all_reports = WasteReport.objects.exclude(id=report.id).filter(
             status__in=['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS']
@@ -112,7 +111,6 @@ class WasteReportViewSet(viewsets.ModelViewSet):
             if haversine_distance(report.latitude, report.longitude, other.latitude, other.longitude) <= 150.0:
                 nearby_count += 1
                 
-        # Check if inside active hotspot
         is_recurring = False
         hotspots = Hotspot.objects.filter(status='ACTIVE')
         for h in hotspots:
@@ -122,10 +120,8 @@ class WasteReportViewSet(viewsets.ModelViewSet):
                 h.save(update_fields=['report_count'])
                 break
                 
-        # Context sensitivity heuristic
         is_sensitive = any(kw in (report.address or '').lower() for kw in ['school', 'hospital', 'market', 'station', 'metro', 'plaza'])
         
-        # Compute explainable priority
         report.update_priority(
             nearby_count=nearby_count,
             age_hours=0.0,
@@ -133,16 +129,18 @@ class WasteReportViewSet(viewsets.ModelViewSet):
             is_sensitive=is_sensitive
         )
 
-        # Reward citizen impact points
         if citizen:
             citizen.impact_points += 20
             citizen.add_badge_if_missing('Waste Watcher')
             citizen.save(update_fields=['impact_points'])
 
+        try:
+            from core.notifications import notify_report_submitted
+            notify_report_submitted(report)
+        except Exception:
+            pass
+
 class CitizenVerificationView(APIView):
-    """
-    Allows a citizen to confirm resolution or reopen the report with feedback.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request, pk):
@@ -176,11 +174,16 @@ class CitizenVerificationView(APIView):
                 citizen.save(update_fields=['impact_points'])
         else:
             report.status = 'REOPENED'
-            # Increase priority score when reopened by citizen
             report.priority_score += 25.0
             report.priority_level = 'CRITICAL' if report.priority_score >= 65 else 'HIGH'
             report.priority_factors.append(f"Reopened by citizen: {reopen_reason}")
             report.save(update_fields=['status', 'priority_score', 'priority_level', 'priority_factors'])
+
+        try:
+            from core.notifications import notify_verification_outcome
+            notify_verification_outcome(report, bool(is_resolved))
+        except Exception:
+            pass
 
         return Response({
             'message': 'Citizen verification recorded successfully.',

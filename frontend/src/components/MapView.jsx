@@ -5,7 +5,6 @@ import 'leaflet/dist/leaflet.css';
 import StatusBadge from './StatusBadge';
 import PriorityBadge from './PriorityBadge';
 
-// Helper to create colored SVG markers without missing asset issues
 const createCustomIcon = (color, label = '') => {
   return L.divIcon({
     className: 'custom-leaflet-marker',
@@ -41,16 +40,15 @@ const createCustomIcon = (color, label = '') => {
 
 const getMarkerColor = (item) => {
   if (item.status === 'RESOLVED' || item.status === 'CITIZEN_VERIFIED' || item.status === 'COLLECTED') {
-    return '#059669'; // Emerald
+    return '#059669'; 
   }
   const priority = (item.priority_level || '').toUpperCase();
-  if (priority === 'CRITICAL') return '#E11D48'; // Rose
-  if (priority === 'HIGH') return '#D97706'; // Amber
-  if (priority === 'LOW') return '#64748B'; // Slate
-  return '#2563EB'; // Blue
+  if (priority === 'CRITICAL') return '#E11D48'; 
+  if (priority === 'HIGH') return '#D97706'; 
+  if (priority === 'LOW') return '#64748B'; 
+  return '#2563EB'; 
 };
 
-// Location picker click handler for Report Wizard
 function LocationPickerEvents({ onLocationSelect }) {
   useMapEvents({
     click(e) {
@@ -90,7 +88,7 @@ export default function MapView({
 
         {onLocationSelect && <LocationPickerEvents onLocationSelect={onLocationSelect} />}
 
-        {/* Selected Draggable Location Marker for Report creation */}
+        {}
         {selectedLocation && (
           <Marker
             position={[selectedLocation.lat, selectedLocation.lng]}
@@ -115,7 +113,6 @@ export default function MapView({
           </Marker>
         )}
 
-        {/* Hotspots Density / Recurrence Circles */}
         {showHotspots &&
           hotspots.map((h) => (
             <React.Fragment key={`hotspot-${h.id}`}>
@@ -154,7 +151,6 @@ export default function MapView({
             </React.Fragment>
           ))}
 
-        {/* Route Polyline for Worker Navigation */}
         {routePolyline && routePolyline.length > 1 && (
           <Polyline
             positions={routePolyline}
@@ -162,7 +158,6 @@ export default function MapView({
           />
         )}
 
-        {/* Normal Incident & Waste Report Markers */}
         {items.map((item) => (
           <Marker
             key={`report-${item.id}`}
@@ -174,7 +169,7 @@ export default function MapView({
           >
             <Popup>
               <div className="p-1 max-w-xs text-xs space-y-2">
-                {/* Photo Preview if present */}
+                {}
                 {(item.image_url || item.image) && (
                   <img
                     src={item.image_url || item.image}
@@ -201,7 +196,6 @@ export default function MapView({
           </Marker>
         ))}
 
-        {/* Pickup Request Markers */}
         {pickups.map((p) => (
           <Marker
             key={`pickup-${p.id}`}

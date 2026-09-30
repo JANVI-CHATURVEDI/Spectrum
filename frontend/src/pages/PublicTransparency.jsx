@@ -34,7 +34,6 @@ export default function PublicTransparency() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-teal-600 rounded-2xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
@@ -58,7 +57,6 @@ export default function PublicTransparency() {
         </div>
       </div>
 
-      {/* Public Map */}
       <div className="space-y-2">
         <div className="flex justify-between items-center text-xs text-slate-500">
           <span>Live anonymized waste incidents & cleared spots</span>
@@ -71,7 +69,6 @@ export default function PublicTransparency() {
         />
       </div>
 
-      {/* Recent Cleaned Locations List */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-slate-900 text-base">Recently Cleared Heaps & Verification Status</h3>

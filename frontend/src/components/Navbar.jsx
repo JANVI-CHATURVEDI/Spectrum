@@ -1,29 +1,42 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Eye, Shield, User, HardHat, Compass, BarChart3, BookOpen, LogOut, ChevronDown, Award } from 'lucide-react';
+import {
+  Eye, Shield, User, HardHat, Compass, ChevronDown,
+  Award, LogOut, FlaskConical,
+} from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+
+const PERSONAS = [
+  { id: 'citizen', label: 'Citizen', icon: User, desc: 'Report & track neighborhood waste' },
+  { id: 'worker', label: 'Sanitation Worker', icon: HardHat, desc: "Manage today's route & upload proof" },
+  { id: 'supervisor', label: 'Supervisor', icon: Compass, desc: 'Operations dispatch & team rebalancing' },
+  { id: 'admin', label: 'Administrator', icon: Shield, desc: 'City Command Center & analytics' },
+];
+
+const PERSONA_HOME = { citizen: '/citizen', worker: '/worker', supervisor: '/supervisor', admin: '/admin' };
+
+const LINKS = [
+  { tab: 'landing', path: '/', label: 'Overview', active: 'bg-slate-100 text-slate-900 font-semibold', roles: null },
+  { tab: 'citizen', path: '/citizen', label: 'Citizen', active: 'bg-emerald-50 text-emerald-700 font-semibold', roles: ['CITIZEN'] },
+  { tab: 'worker', path: '/worker', label: 'Route', active: 'bg-emerald-50 text-emerald-700 font-semibold', roles: ['WORKER'] },
+  { tab: 'supervisor', path: '/supervisor', label: 'Operations', active: 'bg-emerald-50 text-emerald-700 font-semibold', roles: ['SUPERVISOR'] },
+  { tab: 'admin', path: '/admin', label: 'Command Center', active: 'bg-emerald-50 text-emerald-700 font-semibold', roles: ['ADMIN'] },
+  { tab: 'public', path: '/public', label: 'City Transparency', active: 'bg-blue-50 text-blue-700 font-semibold', roles: null },
+  { tab: 'awareness', path: '/awareness', label: 'Know Your Waste', active: 'bg-teal-50 text-teal-700 font-semibold', roles: null },
+];
 
 export default function Navbar({ activeTab, setActiveTab }) {
   const { user, role, switchRole, logout } = useAuth();
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [userOpen, setUserOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const rolesList = [
-    { id: 'citizen', label: 'Citizen', icon: User, desc: 'Report & track neighborhood waste' },
-    { id: 'worker', label: 'Sanitation Worker', icon: HardHat, desc: "Manage today's route & upload proof" },
-    { id: 'supervisor', label: 'Supervisor', icon: Compass, desc: 'Operations dispatch & team rebalancing' },
-    { id: 'admin', label: 'Administrator', icon: Shield, desc: 'City Command Center & analytics' },
-  ];
-
-  const handleRoleSelect = async (roleId) => {
+  const handlePersona = async (roleId) => {
     await switchRole(roleId);
-    setRoleMenuOpen(false);
+    setDemoOpen(false);
     setActiveTab(roleId);
-    if (roleId === 'citizen') navigate('/citizen');
-    else if (roleId === 'worker') navigate('/worker');
-    else if (roleId === 'supervisor') navigate('/supervisor');
-    else if (roleId === 'admin') navigate('/admin');
+    navigate(PERSONA_HOME[roleId]);
   };
 
   const handleNav = (tab, path) => {
@@ -31,11 +44,22 @@ export default function Navbar({ activeTab, setActiveTab }) {
     navigate(path);
   };
 
+  const handleLogout = () => {
+    logout();
+    setUserOpen(false);
+    handleNav('landing', '/');
+  };
+
+  const displayName = user
+    ? [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username
+    : '';
+
+  const visibleLinks = LINKS.filter(l => !l.roles || !user || role === 'ADMIN' || l.roles.includes(role));
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Brand Logo */}
           <div
             onClick={() => handleNav('landing', '/')}
             className="flex items-center gap-3 cursor-pointer group"
@@ -62,104 +86,91 @@ export default function Navbar({ activeTab, setActiveTab }) {
             </div>
           </div>
 
-          {/* Center Navigation Links */}
           <nav className="hidden md:flex items-center space-x-1">
-            <button
-              onClick={() => handleNav('landing', '/')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === '/' ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => handleNav('citizen', '/citizen')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === '/citizen' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              Citizen
-            </button>
-            <button
-              onClick={() => handleNav('worker', '/worker')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === '/worker' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              Route
-            </button>
-            <button
-              onClick={() => handleNav('supervisor', '/supervisor')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === '/supervisor' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              Operations
-            </button>
-            <button
-              onClick={() => handleNav('admin', '/admin')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === '/admin' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              Command Center
-            </button>
-            <button
-              onClick={() => handleNav('public', '/public')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === '/public' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              City Transparency
-            </button>
-            <button
-              onClick={() => handleNav('awareness', '/awareness')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === '/awareness' ? 'bg-teal-50 text-teal-700 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              Know Your Waste
-            </button>
+            {visibleLinks.map(l => (
+              <button
+                key={l.tab}
+                onClick={() => handleNav(l.tab, l.path)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  location.pathname === l.path ? l.active : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                {l.label}
+              </button>
+            ))}
           </nav>
 
-          {/* Right Action: Demo Role Switcher & Profile */}
-          <div className="flex items-center gap-3">
-            {role === 'CITIZEN' && (
+          <div className="flex items-center gap-2.5">
+            {user && role === 'CITIZEN' && (
               <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 rounded-full text-xs font-semibold">
                 <Award className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{user?.impact_points || 140} pts</span>
+                <span>{user.impact_points ?? 0} pts</span>
               </div>
             )}
 
-            {/* Role Switcher Menu */}
+            {user ? (
+              <div className="relative">
+                <button
+                  onClick={() => { setUserOpen(o => !o); setDemoOpen(false); }}
+                  className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-800 transition shadow-sm"
+                >
+                  <span className="w-7 h-7 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold">
+                    {(displayName[0] || 'U').toUpperCase()}
+                  </span>
+                  <span className="max-w-24 truncate hidden sm:inline">{displayName}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                </button>
+                {userOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
+                    <div className="px-3 py-1.5 text-[11px] text-slate-500">
+                      Signed in as <strong className="text-slate-800">{displayName}</strong>
+                      <span className="block text-[10px] uppercase tracking-wide font-bold text-emerald-700">{role}</span>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-3 py-2 flex items-center gap-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                    >
+                      <LogOut className="w-4 h-4" /> Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => handleNav('login', '/login')}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition shadow-sm"
+              >
+                Login / Sign up
+              </button>
+            )}
+
             <div className="relative">
               <button
-                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-medium text-slate-800 transition-colors shadow-sm"
+                onClick={() => { setDemoOpen(o => !o); setUserOpen(false); }}
+                title="One-click demo personas for evaluation"
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-dashed border-slate-300 text-slate-500 hover:text-emerald-700 hover:border-emerald-300 text-[11px] font-bold transition"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>Role: <strong className="font-semibold text-slate-900">{role}</strong></span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                <FlaskConical className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Demo</span>
               </button>
-
-              {roleMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+              {demoOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
                   <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Switch Persona for Demo
+                    Switch persona for demo
                   </div>
-                  {rolesList.map((r) => {
-                    const IconComponent = r.icon;
-                    const isCurrent = role.toLowerCase() === r.id;
+                  {PERSONAS.map((r) => {
+                    const Icon = r.icon;
+                    const isCurrent = user && role.toLowerCase() === r.id;
                     return (
                       <button
                         key={r.id}
-                        onClick={() => handleRoleSelect(r.id)}
+                        onClick={() => handlePersona(r.id)}
                         className={`w-full text-left px-3 py-2 flex items-start gap-2.5 hover:bg-slate-50 transition-colors ${
                           isCurrent ? 'bg-emerald-50/70 text-emerald-900' : 'text-slate-700'
                         }`}
                       >
                         <div className={`p-1.5 rounded-md mt-0.5 ${isCurrent ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
-                          <IconComponent className="w-4 h-4" />
+                          <Icon className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="text-xs font-semibold">{r.label} {isCurrent && '✓'}</div>

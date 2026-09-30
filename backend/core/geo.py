@@ -1,14 +1,10 @@
 import math
 
 def haversine_distance(lat1, lon1, lat2, lon2):
-    """
-    Calculate the great circle distance between two points 
-    on the earth in meters using the Haversine formula.
-    """
     if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
         return float('inf')
         
-    R = 6371000  # radius of Earth in meters
+    R = 6371000
     phi1 = math.radians(lat1)
     phi2 = math.radians(lat2)
     delta_phi = math.radians(lat2 - lat1)

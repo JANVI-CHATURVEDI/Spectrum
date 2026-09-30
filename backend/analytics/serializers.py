@@ -4,7 +4,6 @@ from reports.models import WasteReport
 
 
 class AreaCleanlinessIndexSerializer(serializers.ModelSerializer):
-    """Exposes both `zone` and the `ward_name` alias the dashboard renders."""
     ward_name = serializers.CharField(source='zone', read_only=True)
     resolution_rate = serializers.SerializerMethodField()
 

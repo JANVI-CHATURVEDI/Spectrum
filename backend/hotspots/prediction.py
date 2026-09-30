@@ -5,20 +5,13 @@ from reports.models import WasteReport
 from core.geo import haversine_distance
 
 def predict_hotspot_overflows() -> list[dict]:
-    """
-    Time-series and day-of-week + location density forecasting.
-    Predicts which municipal spots are likely to overflow within the next 48 hours
-    with clear, explainable civic reasoning.
-    """
     now = timezone.now()
-    day_of_week = now.weekday()  # 0=Monday, 6=Sunday
-    # Weekend surge modifier (Friday, Saturday, Sunday)
+    day_of_week = now.weekday()
     weekend_multiplier = 1.35 if day_of_week in [4, 5, 6] else 1.05
 
     hotspots = Hotspot.objects.filter(status__in=['ACTIVE', 'MONITORED']).select_related('dominant_category')
     predictions = []
 
-    # Bounding box / prefetch reports from last 4 days
     four_days_ago = now - timedelta(days=4)
     recent_reports = list(
         WasteReport.objects.filter(created_at__gte=four_days_ago)
@@ -26,11 +19,9 @@ def predict_hotspot_overflows() -> list[dict]:
     )
 
     for h in hotspots:
-        # Count nearby recent reports
         nearby_recent = 0
         unresolved_nearby = 0
         for r in recent_reports:
-            # Quick bounding box prefilter (~0.003 deg is ~300m)
             if abs(r.latitude - h.latitude) <= 0.004 and abs(r.longitude - h.longitude) <= 0.004:
                 dist = haversine_distance(h.latitude, h.longitude, r.latitude, r.longitude)
                 if dist <= h.radius_meters:
@@ -38,11 +29,9 @@ def predict_hotspot_overflows() -> list[dict]:
                     if r.status in ['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'REOPENED']:
                         unresolved_nearby += 1
 
-        # Base accumulation rate (reports per day)
         base_rate = max(1.2, h.report_count / 7.0)
         recent_surge = (nearby_recent / 4.0) / max(0.5, base_rate)
         
-        # Calculate overflow probability score (0 to 100%)
         raw_prob = (
             (unresolved_nearby * 18.0) +
             (recent_surge * 25.0) +
@@ -51,7 +40,6 @@ def predict_hotspot_overflows() -> list[dict]:
 
         prob = min(98, max(24, int(raw_prob)))
 
-        # Forecast window
         if prob >= 75:
             risk_level = 'HIGH RISK'
             timeframe = 'Next 12 - 24 hours'
@@ -97,6 +85,5 @@ def predict_hotspot_overflows() -> list[dict]:
             'recommended_action': recommended_action,
         })
 
-    # Sort highest overflow risk first
     predictions.sort(key=lambda x: x['overflow_probability'], reverse=True)
     return predictions
