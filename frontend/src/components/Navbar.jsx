@@ -40,7 +40,16 @@ export default function Navbar({ activeTab, setActiveTab }) {
             onClick={() => handleNav('landing', '/')}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+            <img
+              src="/logo.png"
+              alt="SwachDrishti Logo"
+              className="w-10 h-10 rounded-xl object-contain shadow-sm group-hover:scale-105 transition-transform bg-white p-0.5 border border-slate-200"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextElementSibling.style.display = 'flex';
+              }}
+            />
+            <div className="hidden w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
               <Eye className="w-5 h-5" />
             </div>
             <div>

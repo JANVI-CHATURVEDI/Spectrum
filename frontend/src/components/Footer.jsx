@@ -9,7 +9,16 @@ export default function Footer({ setActiveTab }) {
           {/* Brand Col */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
+              <img
+                src="/logo.png"
+                alt="SwachDrishti Logo"
+                className="w-8 h-8 rounded-lg object-contain bg-white p-0.5 border border-slate-700"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'flex';
+                }}
+              />
+              <div className="hidden w-8 h-8 rounded-lg bg-emerald-600 items-center justify-center text-white">
                 <Eye className="w-4 h-4" />
               </div>
               <span className="text-lg font-bold text-white tracking-tight">
