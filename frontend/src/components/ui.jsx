@@ -73,3 +73,20 @@ export function useLockBody(locked) {
     return () => { document.body.style.overflow = prev; };
   }, [locked]);
 }
+
+export function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed === undefined || parsed === null ? fallback : parsed;
+  } catch {
+    return fallback;
+  }
+}
+
+export function saveJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}

@@ -7,7 +7,12 @@ import PriorityBadge from '../components/PriorityBadge';
 import { Plus, CheckCircle, RefreshCw, AlertTriangle, Sparkles, Navigation } from 'lucide-react';
 
 import { ChevronRight, X, MapPin, Camera } from 'lucide-react';
-import { EmptyState } from '../components/ui';
+import { EmptyState, loadJSON, saveJSON } from '../components/ui';
+
+const REPORT_PREFS_KEY = 'swachdrishti.report.prefs.v1';
+const REPORT_DRAFT_KEY = 'swachdrishti.report.draft.v1';
+const PICKUP_PREFS_KEY = 'swachdrishti.pickup.prefs.v1';
+const HOME_SPOT = { lat: 28.6280, lng: 77.2180 };
 
 export default function CitizenDashboard() {
   const [reports, setReports] = useState([]);
@@ -20,12 +25,15 @@ export default function CitizenDashboard() {
   const [openReport, setOpenReport] = useState(null);
   const [brokenPhotoId, setBrokenPhotoId] = useState(null);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [severity, setSeverity] = useState('MEDIUM');
-  const [address, setAddress] = useState('');
-  const [coords, setCoords] = useState({ lat: 28.6280, lng: 77.2180 });
+  const [title, setTitle] = useState(() => loadJSON(REPORT_DRAFT_KEY, {}).title || '');
+  const [description, setDescription] = useState(() => loadJSON(REPORT_DRAFT_KEY, {}).description || '');
+  const [category, setCategory] = useState(() => loadJSON(REPORT_PREFS_KEY, {}).category || '');
+  const [severity, setSeverity] = useState(() => loadJSON(REPORT_PREFS_KEY, {}).severity || 'MEDIUM');
+  const [address, setAddress] = useState(() => loadJSON(REPORT_PREFS_KEY, {}).address || '');
+  const [coords, setCoords] = useState(() => {
+    const c = loadJSON(REPORT_PREFS_KEY, {}).coords;
+    return c && Number.isFinite(c.lat) && Number.isFinite(c.lng) ? { lat: c.lat, lng: c.lng } : { ...HOME_SPOT };
+  });
   const [duplicateWarning, setDuplicateWarning] = useState(null);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiSummary, setAiSummary] = useState(null);
@@ -34,9 +42,9 @@ export default function CitizenDashboard() {
   const [submitting, setSubmitting] = useState(false);
 
   const [pickupType, setPickupType] = useState('BULK');
-  const [pickupVolume, setPickupVolume] = useState('MEDIUM');
-  const [pickupAddress, setPickupAddress] = useState('');
-  const [preferredTime, setPreferredTime] = useState('');
+  const [pickupVolume, setPickupVolume] = useState(() => loadJSON(PICKUP_PREFS_KEY, {}).pickupVolume || 'MEDIUM');
+  const [pickupAddress, setPickupAddress] = useState(() => loadJSON(PICKUP_PREFS_KEY, {}).pickupAddress || '');
+  const [preferredTime, setPreferredTime] = useState(() => loadJSON(PICKUP_PREFS_KEY, {}).preferredTime || '');
 
   const [verifyingReport, setVerifyingReport] = useState(null);
   const [verifyFeedback, setVerifyFeedback] = useState('');
@@ -125,6 +133,18 @@ export default function CitizenDashboard() {
   const [gpsFix, setGpsFix] = useState(null);   
   const [gpsError, setGpsError] = useState('');
 
+  useEffect(() => {
+    saveJSON(REPORT_PREFS_KEY, { address, coords, severity, category });
+  }, [address, coords, severity, category]);
+
+  useEffect(() => {
+    saveJSON(REPORT_DRAFT_KEY, { title, description });
+  }, [title, description]);
+
+  useEffect(() => {
+    saveJSON(PICKUP_PREFS_KEY, { pickupAddress, pickupVolume, preferredTime });
+  }, [pickupAddress, pickupVolume, preferredTime]);
+
   const detectMyLocation = () => {
     if (!navigator.geolocation) {
       setGpsError('Geolocation is not supported by this browser.');
@@ -190,7 +210,6 @@ export default function CitizenDashboard() {
       });
       setTitle('');
       setDescription('');
-      setAddress('');
       setAiSummary(null);
       handlePhotoSelect(null);
       setViewTab('reports');
@@ -215,7 +234,6 @@ export default function CitizenDashboard() {
         preferred_slot: preferredTime || 'Morning (9:00 AM - 12:00 PM)',
         preferred_time: preferredTime || 'Morning (9:00 AM - 12:00 PM)',
       });
-      setPickupAddress('');
       setViewTab('pickups');
       fetchData();
     } catch (err) {
@@ -524,6 +542,22 @@ export default function CitizenDashboard() {
                 {gpsError && (
                   <div className="mt-1.5 text-[11px] text-rose-600 font-semibold">{gpsError}</div>
                 )}
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    {(address || coords.lat !== HOME_SPOT.lat || coords.lng !== HOME_SPOT.lng)
+                      ? '✓ Spot remembered for your next report'
+                      : 'Spot saves automatically as you type'}
+                  </span>
+                  {(address || coords.lat !== HOME_SPOT.lat || coords.lng !== HOME_SPOT.lng) && (
+                    <button
+                      type="button"
+                      onClick={() => { setAddress(''); setCoords({ ...HOME_SPOT }); setGpsFix(null); }}
+                      className="text-[10px] font-bold text-slate-400 hover:text-rose-600 transition shrink-0"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
