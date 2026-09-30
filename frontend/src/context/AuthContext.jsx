@@ -30,9 +30,19 @@ export const AuthProvider = ({ children }) => {
         const res = await api.get('/api/auth/me/');
         setUser(res.data.user);
       } catch (err) {
-        console.warn('Token expired or invalid, clearing local session');
+        console.warn('Token expired or invalid, resetting to demo citizen');
         localStorage.removeItem('swachdrishti_token');
         setToken('');
+        setUser({
+          id: 1,
+          username: 'citizen',
+          first_name: 'Aarav',
+          last_name: 'Sharma',
+          role: 'CITIZEN',
+          zone: 'Zone 1 - Central',
+          impact_points: 140,
+          badges: ['Waste Watcher', 'Clean Street Contributor'],
+        });
       } finally {
         setLoading(false);
       }
