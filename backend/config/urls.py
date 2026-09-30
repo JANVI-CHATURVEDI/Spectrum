@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/analytics/', include('analytics.urls')),
     path('api/awareness/', include('awareness.urls')),
     path('api/ai/', include('ai_service.urls')),
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 if settings.DEBUG or not getattr(settings, 'USE_NEON_OBJECT_STORAGE', False):

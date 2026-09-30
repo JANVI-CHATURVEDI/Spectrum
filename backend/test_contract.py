@@ -168,6 +168,48 @@ class AuthContractTests(ContractTestCase):
         self.assertTrue(any(w['role'] == 'WORKER' for w in res.json()))
 
 
+class NotificationContractTests(ContractTestCase):
+    def _token(self, username):
+        return self.client.post(
+            '/api/auth/login/',
+            {'username': username, 'password': 'secret123'},
+        ).json()['token']
+
+    def test_anonymous_blocked(self):
+        self.assertEqual(self.client.get('/api/notifications/').status_code, 401)
+        self.assertEqual(self.client.get('/api/notifications/unread-count/').status_code, 401)
+        self.assertEqual(self.client.post('/api/notifications/mark-read/', {}).status_code, 401)
+
+    def test_task_assign_notifies_worker_everywhere(self):
+        token = self._token('contract_supervisor')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.post('/api/operations/assign/', {
+            'worker_id': self.worker.id, 'report_id': self.report.id,
+        })
+        self.assertEqual(res.status_code, 201)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self._token("contract_worker")}')
+        count = self.client.get('/api/notifications/unread-count/').json()
+        self.assertGreaterEqual(count['unread'], 1)
+        rows = self.client.get('/api/notifications/').json()['results']
+        self.assertTrue(any(r['kind'] == 'TASK_ASSIGNED' for r in rows))
+        marked = self.client.post('/api/notifications/mark-read/', {}).json()
+        self.assertGreaterEqual(marked['marked_read'], 1)
+        count2 = self.client.get('/api/notifications/unread-count/').json()
+        self.assertEqual(count2['unread'], 0)
+
+    def test_report_submit_creates_citizen_notification(self):
+        token = self._token('contract_citizen')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.post('/api/reports/', {
+            'title': 'Bin spill', 'description': 'spill near gate',
+            'category': self.category.id, 'latitude': 28.63, 'longitude': 77.22,
+            'address': 'Lane 5', 'severity': 'LOW',
+        })
+        self.assertEqual(res.status_code, 201)
+        rows = self.client.get('/api/notifications/').json()['results']
+        self.assertTrue(any(r['kind'] == 'REPORT_SUBMITTED' for r in rows))
+
+
 class ReportsContractTests(ContractTestCase):
     def test_report_list_lives_at_root(self):
         res = self.client.get('/api/reports/')

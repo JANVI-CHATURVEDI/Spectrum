@@ -42,4 +42,9 @@ class PickupRequestViewSet(viewsets.ModelViewSet):
                     'last_name': 'Citizen',
                 },
             )
-        serializer.save(citizen=citizen)
+        pickup = serializer.save(citizen=citizen)
+        try:
+            from core.notifications import notify_pickup_requested
+            notify_pickup_requested(pickup)
+        except Exception:
+            pass

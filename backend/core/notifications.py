@@ -3,6 +3,7 @@ import threading
 
 from django.conf import settings
 from django.core.mail import send_mail
+from notifications.models import push_notification
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,11 @@ def _citizen_contact(report):
     return email, phone, name
 
 
+def _citizen_user(report):
+    user = getattr(report, 'citizen', None)
+    return user if user is not None and getattr(user, 'pk', None) else None
+
+
 def notify_report_submitted(report):
     try:
         email, phone, name = _citizen_contact(report)
@@ -79,6 +85,10 @@ def notify_report_submitted(report):
             send_email_safe(email, subject, body)
         if phone:
             send_sms_safe(phone, f'SwachDrishti: report #{report.id} received ({report.priority_level} priority). Track: {link}')
+        user = _citizen_user(report)
+        if user:
+            push_notification(user, 'REPORT_SUBMITTED', subject,
+                              f'"{report.title}" scored {report.priority_level} priority.', '/citizen')
     except Exception as e:
         logger.warning('notify_report_submitted failed (non-fatal): %s', e)
 
@@ -102,6 +112,10 @@ def notify_verification_required(report):
             send_email_safe(email, subject, body)
         if phone:
             send_sms_safe(phone, f'SwachDrishti: report #{report.id} cleaned — please verify: {link}')
+        user = _citizen_user(report)
+        if user:
+            push_notification(user, 'VERIFICATION_REQUIRED', subject,
+                              f'"{report.title}" is marked cleaned. Confirm or reopen it.', '/citizen')
     except Exception as e:
         logger.warning('notify_verification_required failed (non-fatal): %s', e)
 
@@ -133,5 +147,58 @@ def notify_verification_outcome(report, is_resolved):
             send_email_safe(email, subject, body)
         if phone:
             send_sms_safe(phone, sms)
+        user = _citizen_user(report)
+        if user:
+            push_notification(user, 'VERIFIED_CLOSED' if is_resolved else 'REOPENED', subject,
+                              f'"{report.title}" ' + ('is closed. +30 impact points.' if is_resolved else f'escalated to {report.priority_level}.'),
+                              '/citizen')
     except Exception as e:
         logger.warning('notify_verification_outcome failed (non-fatal): %s', e)
+
+
+def notify_task_assigned(worker, title, link='/worker'):
+    try:
+        email = getattr(worker, 'email', '') or ''
+        phone = getattr(worker, 'phone', '') or ''
+        name = worker.get_full_name() or worker.username
+        subject = f'New dispatch: {title[:60]}'
+        body = (
+            f'Hi {name},\n\n'
+            f'A new cleanup task was assigned to you: "{title}".\n'
+            f'Open your route: {settings.FRONTEND_URL}/worker\n\n'
+            f'— Team SwachDrishti'
+        )
+        if email:
+            send_email_safe(email, subject, body)
+        if phone:
+            send_sms_safe(phone, f'SwachDrishti dispatch: {title[:80]}. Open /worker.')
+        push_notification(worker, 'TASK_ASSIGNED', subject,
+                          f'"{title}" is waiting on your route.', link)
+    except Exception as e:
+        logger.warning('notify_task_assigned failed (non-fatal): %s', e)
+
+
+def notify_pickup_requested(pickup):
+    try:
+        citizen = getattr(pickup, 'citizen', None)
+        if citizen is None or not getattr(citizen, 'pk', None):
+            return
+        email = getattr(citizen, 'email', '') or ''
+        phone = getattr(citizen, 'phone', '') or ''
+        name = citizen.get_full_name() or citizen.username
+        link = f'{settings.FRONTEND_URL}/citizen'
+        subject = f'Pickup #{pickup.pk} requested — {pickup.waste_type}'
+        body = (
+            f'Hi {name},\n\n'
+            f'Your {pickup.waste_type} pickup request (#{pickup.pk}) is received for {pickup.address}.\n'
+            f'Track it here: {link}\n\n'
+            f'— Team SwachDrishti'
+        )
+        if email:
+            send_email_safe(email, subject, body)
+        if phone:
+            send_sms_safe(phone, f'SwachDrishti: pickup #{pickup.pk} ({pickup.waste_type}) received.')
+        push_notification(citizen, 'PICKUP_UPDATE', subject,
+                          f'{pickup.waste_type} pickup at {pickup.address}.', '/citizen')
+    except Exception as e:
+        logger.warning('notify_pickup_requested failed (non-fatal): %s', e)

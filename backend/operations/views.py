@@ -98,6 +98,23 @@ class AssignTaskView(APIView):
             notes=notes
         )
 
+        try:
+            from core.notifications import notify_task_assigned
+            if report_id:
+                try:
+                    label = WasteReport.objects.get(id=report_id).title
+                except WasteReport.DoesNotExist:
+                    label = f'Report #{report_id}'
+            elif pickup_id:
+                label = f'Pickup #{pickup_id}'
+            elif incident_id:
+                label = f'Incident #{incident_id}'
+            else:
+                label = f'Task #{assignment.pk}'
+            notify_task_assigned(worker, label)
+        except Exception:
+            pass
+
         return Response({
             'message': f"Task successfully assigned to worker {worker.get_full_name() or worker.username}.",
             'assignment': TaskAssignmentSerializer(assignment).data
