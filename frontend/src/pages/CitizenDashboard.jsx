@@ -225,13 +225,22 @@ export default function CitizenDashboard() {
         />
       </div>
 
-      {/* Form Overlay: New Waste Report */}
+      {/* Form Modal / Overlay: New Waste Report */}
       {viewTab === 'new-report' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 animate-in fade-in">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-slate-900">Report a Waste Issue</h2>
-            <button onClick={() => setViewTab('reports')} className="text-slate-400 hover:text-slate-600 text-sm">Cancel</button>
-          </div>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 sm:p-8 max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6 border-b pb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">Report a Waste Issue</h2>
+                <p className="text-xs text-slate-500 mt-1">Submit a location-verified waste pile or missed collection</p>
+              </div>
+              <button 
+                onClick={() => setViewTab('reports')} 
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
 
           {duplicateWarning && (
             <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
@@ -264,10 +273,10 @@ export default function CitizenDashboard() {
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 >
-                  {categories.map((c) => (
+                  {(Array.isArray(categories) ? categories : []).map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
-                  {categories.length === 0 && <option value="1">General / Mixed Waste</option>}
+                  {(!categories || categories.length === 0) && <option value="1">General / Mixed Waste</option>}
                 </select>
               </div>
             </div>
@@ -347,6 +356,7 @@ export default function CitizenDashboard() {
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
 

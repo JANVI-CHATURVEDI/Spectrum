@@ -91,6 +91,7 @@ class CurrentUserView(APIView):
 class WorkersListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return User.objects.filter(role=User.ROLE_WORKER)
