@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import MapView from '../components/MapView';
+import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge';
 import { Plus, CheckCircle, RefreshCw, AlertTriangle, Sparkles, Navigation } from 'lucide-react';
@@ -314,7 +315,7 @@ export default function CitizenDashboard() {
       </div>
 
       {viewTab === 'new-report' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <Modal onClose={() => setViewTab('reports')}>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 sm:p-8 max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6 border-b pb-4">
               <div>
@@ -438,6 +439,18 @@ export default function CitizenDashboard() {
                   {' · '}Category: <strong>{aiSummary.suggested_category_name || 'Mixed waste'}</strong>
                   {aiSummary.estimated_volume && (<> {' · '}Est. volume: <strong>{aiSummary.estimated_volume}</strong></>)}
                 </div>
+                {(aiSummary.suggested_title || aiSummary.suggested_description) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (aiSummary.suggested_title) setTitle(aiSummary.suggested_title);
+                      if (aiSummary.suggested_description) setDescription(aiSummary.suggested_description);
+                    }}
+                    className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 transition"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Use AI draft for title & description
+                  </button>
+                )}
                 {Array.isArray(aiSummary.hazard_flags) && aiSummary.hazard_flags.filter(h => h && h !== 'none').length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-1">
                     {aiSummary.hazard_flags.filter(h => h && h !== 'none').map((h) => (
@@ -532,11 +545,11 @@ export default function CitizenDashboard() {
             </div>
           </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {viewTab === 'new-pickup' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 animate-in fade-in">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-slate-900">Request On-Demand Bulk / E-Waste Pickup</h2>
             <button onClick={() => setViewTab('pickups')} className="text-slate-400 hover:text-slate-600 text-sm">Cancel</button>
@@ -717,13 +730,9 @@ export default function CitizenDashboard() {
       )}
 
       {openReport && (
-        <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setOpenReport(null)}
-        >
+        <Modal onClose={() => setOpenReport(null)}>
           <div
-            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto modal-pop my-auto shrink-0"
           >
             <div className="relative bg-slate-100">
               {(openReport.image_url || openReport.image) && brokenPhotoId !== openReport.id ? (
@@ -783,6 +792,22 @@ export default function CitizenDashboard() {
               <p className="text-slate-700 leading-relaxed">
                 {openReport.description || 'No extended description was provided for this issue.'}
               </p>
+
+              {(openReport.after_image_url || openReport.after_image) && (
+                <div className="rounded-xl overflow-hidden border border-emerald-200">
+                  <img
+                    src={openReport.after_image_url || openReport.after_image}
+                    alt="Cleanup proof uploaded by the field worker"
+                    className="w-full h-44 object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  <div className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[11px] font-bold">
+                    Cleanup proof · uploaded by field worker
+                    {openReport.cleanup_score !== null && openReport.cleanup_score !== undefined
+                      ? ` · AI score ${openReport.cleanup_score}/100` : ''}
+                  </div>
+                </div>
+              )}
 
               <div className="p-3 bg-slate-50 rounded-xl space-y-1.5">
                 <div className="flex items-start gap-1.5 text-slate-700 font-semibold">
@@ -871,12 +896,12 @@ export default function CitizenDashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {verifyingReport && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+        <Modal onClose={() => setVerifyingReport(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 modal-pop my-auto shrink-0 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">Did the crew resolve this issue?</h3>
             <p className="text-xs text-slate-600">
               Your verification creates transparency and confirms the spot is spotless.
@@ -907,7 +932,7 @@ export default function CitizenDashboard() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

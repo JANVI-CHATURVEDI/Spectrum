@@ -3,7 +3,8 @@ import api from '../api/client';
 import MapView from '../components/MapView';
 import StatusBadge from '../components/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge';
-import { BarChart3, TrendingUp, Sparkles, AlertOctagon, CheckCircle2, ShieldAlert, Search, RefreshCw } from 'lucide-react';
+import StaffCreator from '../components/StaffCreator';
+import { BarChart3, TrendingUp, Sparkles, AlertOctagon, CheckCircle2, ShieldAlert, Search, RefreshCw, Users } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [overview, setOverview] = useState(null);
@@ -12,6 +13,7 @@ export default function AdminDashboard() {
   const [hotspots, setHotspots] = useState([]);
   const [aiInsights, setAiInsights] = useState(null);
   const [forecast, setForecast] = useState(null);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -21,16 +23,18 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [ovRes, clRes, repRes, hotRes] = await Promise.all([
+      const [ovRes, clRes, repRes, hotRes, staffRes] = await Promise.all([
         api.get('/api/analytics/overview/').catch(() => ({ data: null })),
         api.get('/api/analytics/cleanliness-index/').catch(() => ({ data: [] })),
         api.get('/api/reports/'),
         api.get('/api/hotspots/'),
+        api.get('/api/auth/workers/').catch(() => ({ data: [] })),
       ]);
       setOverview(ovRes.data);
       setCleanliness(clRes.data?.zones || clRes.data?.results || (Array.isArray(clRes.data) ? clRes.data : []));
       setReports(repRes.data?.results || repRes.data || []);
       setHotspots(hotRes.data?.results || hotRes.data || []);
+      setStaff(staffRes.data || []);
       setLoading(false);
 
       const [aiRes, forecastRes] = await Promise.all([
@@ -49,6 +53,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchAdminData();
   }, []);
+
+  const refreshStaff = async () => {
+    try {
+      const res = await api.get('/api/auth/workers/');
+      setStaff(res.data || []);
+    } catch {}
+  };
 
   const handleNlSearch = async (e) => {
     e.preventDefault();
@@ -271,6 +282,43 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+          <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+            <Users className="w-4 h-4 text-emerald-600" />
+            Staff Management
+          </h3>
+          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {staff.length} field accounts
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-500 mb-4">
+          Issue worker and supervisor logins here. Public signup stays citizen-only. New crew
+          appears instantly in the supervisor's Crew Workload Roster and can be dispatched.
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <StaffCreator onCreated={refreshStaff} allowSupervisorRole />
+          <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+            {staff.map(w => (
+              <div key={w.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-bold text-slate-900 text-xs truncate">
+                    {[w.first_name, w.last_name].filter(Boolean).join(' ') || w.username}
+                    <span className="font-semibold text-slate-400"> · @{w.username}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">{w.zone || 'Zone 1 - Central'}{w.phone ? ` · ${w.phone}` : ''}</div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                  {w.role}
+                </span>
+              </div>
+            ))}
+            {staff.length === 0 && (
+              <div className="p-6 text-center text-xs text-slate-400">No field accounts yet — create the first one.</div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

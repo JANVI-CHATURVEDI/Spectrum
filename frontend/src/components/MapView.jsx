@@ -88,7 +88,6 @@ export default function MapView({
 
         {onLocationSelect && <LocationPickerEvents onLocationSelect={onLocationSelect} />}
 
-        {}
         {selectedLocation && (
           <Marker
             position={[selectedLocation.lat, selectedLocation.lng]}
@@ -102,7 +101,7 @@ export default function MapView({
               },
             }}
           >
-            <Popup>
+            <Popup autoPan autoPanPaddingTopLeft={[16, 88]} autoPanPaddingBottomRight={[16, 16]}>
               <div className="text-xs font-semibold text-slate-800">
                 Selected Incident Location
                 <div className="text-[10px] text-slate-500 font-mono">
@@ -131,7 +130,7 @@ export default function MapView({
                 position={[h.latitude, h.longitude]}
                 icon={createCustomIcon('#E11D48')}
               >
-                <Popup>
+                <Popup autoPan autoPanPaddingTopLeft={[16, 88]} autoPanPaddingBottomRight={[16, 16]}>
                   <div className="p-1 space-y-1 max-w-xs text-xs">
                     <div className="font-bold text-rose-700 uppercase tracking-wider text-[10px]">
                       🔥 Recurring Waste Hotspot
@@ -167,9 +166,8 @@ export default function MapView({
               click: () => onItemClick && onItemClick(item),
             }}
           >
-            <Popup>
+            <Popup autoPan autoPanPaddingTopLeft={[16, 88]} autoPanPaddingBottomRight={[16, 16]}>
               <div className="p-1 max-w-xs text-xs space-y-2">
-                {}
                 {(item.image_url || item.image) && (
                   <img
                     src={item.image_url || item.image}
@@ -202,7 +200,7 @@ export default function MapView({
             position={[p.latitude, p.longitude]}
             icon={createCustomIcon('#8B5CF6')}
           >
-            <Popup>
+            <Popup autoPan autoPanPaddingTopLeft={[16, 88]} autoPanPaddingBottomRight={[16, 16]}>
               <div className="p-1 text-xs space-y-1">
                 <div className="font-semibold text-purple-700">📦 On-Demand Pickup #{p.id}</div>
                 <div className="font-bold text-slate-800">{p.waste_type}</div>

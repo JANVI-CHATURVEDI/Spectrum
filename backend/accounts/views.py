@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from .models import User
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
+from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, StaffCreateSerializer
 from .permissions import IsSupervisor, IsAdminRole
 
 class RegisterView(generics.CreateAPIView):
@@ -90,3 +90,28 @@ class WorkersListView(generics.ListAPIView):
 
     def get_queryset(self):
         return User.objects.filter(role=User.ROLE_WORKER)
+
+class StaffCreateView(APIView):
+    permission_classes = [IsSupervisor]
+
+    def post(self, request):
+        role = (request.data.get('role') or User.ROLE_WORKER).upper()
+        if role not in (User.ROLE_WORKER, User.ROLE_SUPERVISOR):
+            return Response(
+                {'role': 'Only WORKER or SUPERVISOR accounts can be created here.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if role == User.ROLE_SUPERVISOR and request.user.role != User.ROLE_ADMIN and not request.user.is_superuser:
+            return Response(
+                {'role': 'Only administrators can create supervisor accounts.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        data['role'] = role
+        serializer = StaffCreateSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response({
+            'user': UserSerializer(user).data,
+            'message': f'{user.get_role_display()} account created. Credentials work immediately.',
+        }, status=status.HTTP_201_CREATED)

@@ -3,6 +3,8 @@ import api from '../api/client';
 import MapView from '../components/MapView';
 import StatusBadge from '../components/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge';
+import StaffCreator from '../components/StaffCreator';
+import Modal from '../components/Modal';
 import { Users, AlertCircle, CheckCircle, Flame, UserCheck, ArrowRight, RefreshCw, Radio, Sparkles, ShieldCheck } from 'lucide-react';
 
 export default function SupervisorDashboard() {
@@ -70,6 +72,13 @@ export default function SupervisorDashboard() {
     }
   };
 
+  const completedReports = reports.filter(r =>
+    r.status === 'RESOLVED' ||
+    r.status === 'CITIZEN_VERIFIED' ||
+    r.after_image_url || r.after_image ||
+    (r.cleanup_score !== null && r.cleanup_score !== undefined)
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       <div className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -128,7 +137,7 @@ export default function SupervisorDashboard() {
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            AI Cleanup Verifications ({reports.filter(r => r.cleanup_score !== null && r.cleanup_score !== undefined || r.status === 'RESOLVED').length})
+            AI Cleanup Verifications ({completedReports.length})
           </button>
         </div>
 
@@ -198,8 +207,7 @@ export default function SupervisorDashboard() {
             </div>
 
             <div className="divide-y divide-slate-100">
-              {reports
-                .filter(r => r.cleanup_score !== null && r.cleanup_score !== undefined || r.status === 'RESOLVED' || r.after_image_url)
+              {completedReports
                 .map((report) => (
                   <div key={report.id} className="p-5 space-y-3 hover:bg-slate-50">
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
@@ -226,20 +234,19 @@ export default function SupervisorDashboard() {
                       </div>
                     )}
 
-                    {}
                     <div className="grid grid-cols-2 gap-3 pt-1">
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold uppercase text-slate-500">Before (Citizen Report)</span>
-                        {report.image_url ? (
-                          <img src={report.image_url} alt="Before" className="h-32 w-full object-cover rounded-lg border border-slate-200" />
+                        {(report.image_url || report.image) ? (
+                          <img src={report.image_url || report.image} alt="Before" className="h-32 w-full object-cover rounded-lg border border-slate-200" />
                         ) : (
                           <div className="h-32 bg-slate-100 rounded-lg flex items-center justify-center text-xs text-slate-400">No before photo</div>
                         )}
                       </div>
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold uppercase text-slate-500">After (Worker Resolution)</span>
-                        {report.after_image_url ? (
-                          <img src={report.after_image_url} alt="After" className="h-32 w-full object-cover rounded-lg border border-emerald-300" />
+                        {(report.after_image_url || report.after_image) ? (
+                          <img src={report.after_image_url || report.after_image} alt="After" className="h-32 w-full object-cover rounded-lg border border-emerald-300" />
                         ) : (
                           <div className="h-32 bg-slate-100 rounded-lg flex items-center justify-center text-xs text-slate-400">Resolution photo pending</div>
                         )}
@@ -247,7 +254,7 @@ export default function SupervisorDashboard() {
                     </div>
                   </div>
                 ))}
-              {reports.filter(r => r.cleanup_score !== null && r.cleanup_score !== undefined || r.status === 'RESOLVED' || r.after_image_url).length === 0 && (
+              {completedReports.length === 0 && (
                 <div className="p-8 text-center text-sm text-slate-400">No completed tasks submitted with verification evidence yet.</div>
               )}
             </div>
@@ -271,12 +278,21 @@ export default function SupervisorDashboard() {
               </div>
             ))}
           </div>
+          <details className="rounded-xl border border-dashed border-slate-300 overflow-hidden">
+            <summary className="cursor-pointer px-4 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition list-none flex items-center justify-between">
+              <span>+ Onboard a field worker</span>
+              <span className="text-slate-400">opens form</span>
+            </summary>
+            <div className="p-4 border-t border-slate-100">
+              <StaffCreator onCreated={() => fetchSupervisorData(false)} />
+            </div>
+          </details>
         </div>
       </div>
 
       {assignTarget && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 animate-in fade-in">
+        <Modal onClose={() => setAssignTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 modal-pop my-auto shrink-0 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">Dispatch Task to Field Worker</h3>
             <div className="p-3 bg-slate-50 rounded-lg text-xs space-y-1">
               <strong>{assignTarget.title}</strong>
@@ -321,7 +337,7 @@ export default function SupervisorDashboard() {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

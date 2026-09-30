@@ -182,6 +182,8 @@ Return ONLY a raw JSON object with these keys:
 - hazard_flags: array chosen from ["medical", "chemical", "blocking_drain", "blocking_road", "fire_risk", "none"]
 - confidence: float between 0.5 and 0.99
 - summary: one concise civic sentence
+- suggested_title: short report headline under 60 chars naming the waste and landmark, e.g. "Overflowing bin near Market Gate 2"
+- suggested_description: 1-2 civic sentences describing exactly what is visible in the photo
 - translated_text: if the photo or text contains Hindi/Hinglish text, the English translation, otherwise an empty string
 No markdown fences."""
             response = client.models.generate_content(
@@ -201,6 +203,8 @@ No markdown fences."""
                 'hazard_flags': data.get('hazard_flags') or [],
                 'confidence': float(data.get('confidence', 0.9)),
                 'summary': data.get('summary') or fallback.get('summary', ''),
+                'suggested_title': (data.get('suggested_title') or '')[:80],
+                'suggested_description': data.get('suggested_description') or '',
                 'translated_text': data.get('translated_text') or '',
                 'source': 'gemini_vision',
                 'ai_suggested': True,
@@ -210,6 +214,8 @@ No markdown fences."""
 
         fallback.setdefault('hazard_flags', cls._heuristic_hazards(description))
         fallback.setdefault('estimated_volume', cls._heuristic_volume(description))
+        fallback.setdefault('suggested_title', '')
+        fallback.setdefault('suggested_description', '')
         fallback.setdefault('ai_suggested', False)
         return fallback
 

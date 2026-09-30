@@ -73,6 +73,8 @@ class AIClassifyView(APIView):
             'severity': severity,
             'suggested_severity': severity,
             'summary': result.get('summary', ''),
+            'suggested_title': result.get('suggested_title', ''),
+            'suggested_description': result.get('suggested_description', ''),
             'confidence': result.get('confidence', 0.9),
             'source': result.get('source', 'heuristic_engine'),
             'hazard_flags': result.get('hazard_flags', []),

@@ -85,6 +85,77 @@ class AuthContractTests(ContractTestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()['user']['username'], 'contract_citizen')
 
+    def test_staff_create_by_supervisor(self):
+        token = self.client.post(
+            '/api/auth/login/',
+            {'username': 'contract_supervisor', 'password': 'secret123'},
+        ).json()['token']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.post('/api/auth/staff/', {
+            'username': 'crew_rookie', 'password': 'worker1234', 'role': 'WORKER',
+            'first_name': 'Rookie', 'phone': '+919999888877', 'zone': 'Zone 2 - South',
+        })
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.json()['user']['role'], 'WORKER')
+        summary = self.client.get('/api/operations/team-summary/').json()
+        names = [w.get('username') or w.get('name') for w in summary['workers_status']]
+        self.assertIn('crew_rookie', names)
+        dup = self.client.post('/api/auth/staff/', {
+            'username': 'crew_rookie', 'password': 'worker1234', 'role': 'WORKER',
+        })
+        self.assertEqual(dup.status_code, 400)
+
+    def test_staff_create_forbidden_for_citizen(self):
+        token = self.client.post(
+            '/api/auth/login/',
+            {'username': 'contract_citizen', 'password': 'secret123'},
+        ).json()['token']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.post('/api/auth/staff/', {
+            'username': 'sneaky', 'password': 'worker1234', 'role': 'WORKER',
+        })
+        self.assertEqual(res.status_code, 403)
+
+    def test_staff_create_admin_creates_supervisor(self):
+        from accounts.models import User
+        User.objects.create_user(username='contract_admin', password='secret123', role='ADMIN')
+        token = self.client.post(
+            '/api/auth/login/',
+            {'username': 'contract_admin', 'password': 'secret123'},
+        ).json()['token']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.post('/api/auth/staff/', {
+            'username': 'crew_boss', 'password': 'boss12345', 'role': 'SUPERVISOR',
+            'first_name': 'Boss',
+        })
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.json()['user']['role'], 'SUPERVISOR')
+        self.client.credentials()
+        login = self.client.post('/api/auth/login/', {'username': 'crew_boss', 'password': 'boss12345'})
+        self.assertEqual(login.status_code, 200)
+
+    def test_staff_create_supervisor_cannot_create_supervisor(self):
+        token = self.client.post(
+            '/api/auth/login/',
+            {'username': 'contract_supervisor', 'password': 'secret123'},
+        ).json()['token']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.post('/api/auth/staff/', {
+            'username': 'boss2', 'password': 'boss12345', 'role': 'SUPERVISOR',
+        })
+        self.assertEqual(res.status_code, 403)
+
+    def test_staff_create_rejects_admin_role(self):
+        token = self.client.post(
+            '/api/auth/login/',
+            {'username': 'contract_supervisor', 'password': 'secret123'},
+        ).json()['token']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.post('/api/auth/staff/', {
+            'username': 'boss', 'password': 'worker1234', 'role': 'ADMIN',
+        })
+        self.assertEqual(res.status_code, 400)
+
     def test_workers_list_is_bare_array(self):
         token = self.client.post(
             '/api/auth/login/',

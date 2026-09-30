@@ -15,6 +15,8 @@ export default function WorkerDashboard() {
   const [liveUpdates, setLiveUpdates] = useState(true);
   const [afterPhoto, setAfterPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [precheck, setPrecheck] = useState(null);
+  const [prechecking, setPrechecking] = useState(false);
 
   const fetchTasks = async (showLoading = true) => {
     try {
@@ -40,6 +42,29 @@ export default function WorkerDashboard() {
     return () => clearInterval(interval);
   }, [liveUpdates]);
 
+  const runPrecheck = async (file) => {
+    const reportId = getTaskReport(selectedTask)?.id;
+    if (!file || !reportId) {
+      setPrecheck(null);
+      return;
+    }
+    setPrechecking(true);
+    setPrecheck(null);
+    try {
+      const fd = new FormData();
+      fd.append('report_id', reportId);
+      fd.append('after_image', file);
+      const res = await api.post('/api/ai/verify-cleanup/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setPrecheck(res.data);
+    } catch {
+      setPrecheck(null);
+    } finally {
+      setPrechecking(false);
+    }
+  };
+
   const handleStatusChange = async (taskId, newStatus) => {
     try {
       setTransitioning(true);
@@ -62,6 +87,7 @@ export default function WorkerDashboard() {
       setNotes('');
       setAfterPhoto(null);
       setPhotoPreview(null);
+      setPrecheck(null);
       await fetchTasks(false);
       if (selectedTask?.id === taskId) {
         setSelectedTask(prev => prev ? { 
@@ -370,8 +396,10 @@ export default function WorkerDashboard() {
                             const reader = new FileReader();
                             reader.onload = (ev) => setPhotoPreview(ev.target.result);
                             reader.readAsDataURL(file);
+                            runPrecheck(file);
                           } else {
                             setPhotoPreview(null);
+                            setPrecheck(null);
                           }
                         }}
                         className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
@@ -381,7 +409,7 @@ export default function WorkerDashboard() {
                           <img src={photoPreview} alt="After Preview" className="h-28 w-full object-cover rounded-lg border border-slate-200" />
                           <button
                             type="button"
-                            onClick={() => { setAfterPhoto(null); setPhotoPreview(null); }}
+                            onClick={() => { setAfterPhoto(null); setPhotoPreview(null); setPrecheck(null); }}
                             className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 text-[10px]"
                           >
                             ✕
@@ -389,6 +417,31 @@ export default function WorkerDashboard() {
                         </div>
                       )}
                     </div>
+
+                    {prechecking && (
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 font-semibold">
+                        <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 border-t-emerald-600 animate-spin" />
+                        AI is comparing before/after photos…
+                      </div>
+                    )}
+                    {precheck && (
+                      <div className={`p-3 rounded-xl border text-[11px] space-y-1 ${precheck.verified ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" /> AI pre-check: {precheck.cleanup_score}/100
+                          </span>
+                          <span className="font-black uppercase text-[10px]">
+                            {precheck.verified ? 'Looks clean' : 'May need more work'}
+                          </span>
+                        </div>
+                        <div className="italic">"{precheck.verdict}"</div>
+                        {Array.isArray(precheck.reasons) && precheck.reasons.length > 0 && (
+                          <ul className="space-y-0.5">
+                            {precheck.reasons.map((r, i) => <li key={i}>• {r}</li>)}
+                          </ul>
+                        )}
+                      </div>
+                    )}
 
                     <button
                       onClick={() => handleStatusChange(selectedTask.id, 'COMPLETED')}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Inbox } from 'lucide-react';
 
 export function Card({ className = '', children, ...rest }) {
@@ -50,8 +50,7 @@ export function Spinner({ label = 'Loading…' }) {
   );
 }
 
-export function StatChip({ icon: Icon, value, label, tone = 'emerald' }) {
-  const tones = {
+export function StatChip({ icon: Icon, value, label, tone = 'emerald' }) {  const tones = {
     emerald: 'bg-emerald-50 border-emerald-200 text-emerald-800',
     blue: 'bg-blue-50 border-blue-200 text-blue-800',
     amber: 'bg-amber-50 border-amber-200 text-amber-800',
@@ -64,4 +63,13 @@ export function StatChip({ icon: Icon, value, label, tone = 'emerald' }) {
       {value} <span className="font-semibold opacity-80">{label}</span>
     </span>
   );
+}
+
+export function useLockBody(locked) {
+  useEffect(() => {
+    if (!locked) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [locked]);
 }
