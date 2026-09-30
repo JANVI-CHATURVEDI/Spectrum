@@ -15,6 +15,7 @@ class WasteCategoryListView(generics.ListAPIView):
     queryset = WasteCategory.objects.all()
     serializer_class = WasteCategorySerializer
     permission_classes = [AllowAny]
+    pagination_class = None
 
 class CheckDuplicateReportView(APIView):
     """

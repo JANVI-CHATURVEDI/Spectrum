@@ -49,7 +49,8 @@ export default function CitizenDashboard() {
       setReports(repRes.data?.results || repRes.data || []);
       setPickups(pickRes.data?.results || pickRes.data || []);
       setHotspots(hotRes.data?.results || hotRes.data || []);
-      setCategories(catRes.data || []);
+      const catData = catRes.data?.results || catRes.data;
+      setCategories(Array.isArray(catData) ? catData : []);
     } catch (err) {
       console.error('Failed to load citizen data:', err);
     } finally {
