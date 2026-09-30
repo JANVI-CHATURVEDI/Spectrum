@@ -19,29 +19,39 @@ class WasteCategoryListView(generics.ListAPIView):
 
 class CheckDuplicateReportView(APIView):
     """
-    Checks if a recent report exists near the specified coordinates (within 60m).
+    Checks if a recent report exists near the specified coordinates.
+    Supports GET (query parameters) and POST (JSON body).
     Allows citizens to join an existing incident or submit separately.
     """
     permission_classes = [AllowAny]
 
-    def post(self, request):
-        lat = float(request.data.get('latitude', 0.0))
-        lng = float(request.data.get('longitude', 0.0))
-        
+    def _check_duplicates(self, request):
+        params = request.query_params if request.method == 'GET' else request.data
+        try:
+            lat = float(params.get('latitude', 0.0))
+            lng = float(params.get('longitude', 0.0))
+        except (ValueError, TypeError):
+            lat, lng = 0.0, 0.0
+
+        try:
+            radius = float(params.get('radius_meters', 75.0))
+        except (ValueError, TypeError):
+            radius = 75.0
+
         two_days_ago = timezone.now() - timedelta(days=2)
         candidates = WasteReport.objects.filter(
             created_at__gte=two_days_ago,
             status__in=['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS']
         )
-        
+
         matches = []
         for rep in candidates:
             dist = haversine_distance(lat, lng, rep.latitude, rep.longitude)
-            if dist <= 75.0:  # Within 75 meters
+            if dist <= radius:
                 matches.append({
                     'id': rep.id,
                     'title': rep.title or f"{rep.category.name} at {rep.address}",
-                    'category': rep.category.name,
+                    'category': rep.category.name if rep.category else 'Mixed waste',
                     'status': rep.status,
                     'distance_meters': round(dist, 1),
                     'created_at': rep.created_at,
@@ -51,9 +61,17 @@ class CheckDuplicateReportView(APIView):
         return Response({
             'has_duplicate': len(matches) > 0,
             'match_count': len(matches),
+            'existing_reports': matches,
             'nearby_incidents': matches,
+            'results': matches,
             'message': 'Possible existing incident detected nearby.' if matches else 'No duplicate incidents nearby.'
         })
+
+    def get(self, request):
+        return self._check_duplicates(request)
+
+    def post(self, request):
+        return self._check_duplicates(request)
 
 class WasteReportViewSet(viewsets.ModelViewSet):
     queryset = WasteReport.objects.all()
@@ -167,5 +185,6 @@ class CitizenVerificationView(APIView):
         return Response({
             'message': 'Citizen verification recorded successfully.',
             'report_status': report.status,
-            'verification': CitizenVerificationSerializer(verification).data
+            'verification': CitizenVerificationSerializer(verification).data,
+            'citizen_verification': CitizenVerificationSerializer(verification).data,
         })

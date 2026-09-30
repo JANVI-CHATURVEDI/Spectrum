@@ -45,16 +45,36 @@ class CityOverviewMetricsView(APIView):
         # Resolution Rate
         rate = round((resolved_reports / total_reports * 100), 1) if total_reports > 0 else 88.5
         
+        # Active workers count
+        from accounts.models import User
+        active_workers = User.objects.filter(role=User.ROLE_WORKER, is_active=True).count() or 8
+
+        # Average turnaround calculation
+        from django.db.models import F, ExpressionWrapper, DurationField
+        resolved_with_time = WasteReport.objects.filter(
+            status__in=['RESOLVED', 'CITIZEN_VERIFIED'],
+            resolved_at__isnull=False
+        ).annotate(
+            duration=ExpressionWrapper(F('resolved_at') - F('created_at'), output_field=DurationField())
+        ).aggregate(avg_time=Avg('duration'))
+        
+        avg_hours = 4.2
+        if resolved_with_time.get('avg_time'):
+            total_sec = resolved_with_time['avg_time'].total_seconds()
+            avg_hours = round(total_sec / 3600.0, 1)
+
         return Response({
             'critical_issues': critical_issues,
             'active_reports': active_reports,
             'pending_pickups': pending_pickups,
             'total_reports': total_reports,
             'resolved_reports': resolved_reports,
+            'resolved_reports_count': resolved_reports,
             'recurring_hotspots': recurring_hotspots,
-            'avg_resolution_hours': 4.2,
+            'avg_resolution_hours': avg_hours,
+            'average_resolution_hours': avg_hours,
             'resolution_rate': rate,
-            'active_workers': 8,
+            'active_workers': active_workers,
             'updated_at': now.isoformat()
         })
 
@@ -79,11 +99,16 @@ class CleanlinessIndexView(APIView):
             indexes = AreaCleanlinessIndex.objects.all()
 
         city_average = round(sum(i.score for i in indexes) / len(indexes), 1) if indexes else 82.0
+        zones_data = AreaCleanlinessIndexSerializer(indexes, many=True).data
+        for z in zones_data:
+            z['ward_name'] = z.get('zone')
+            z['resolution_rate'] = f"{int(z.get('resolution_speed_score', 85))}%"
 
         return Response({
             'city_average_score': city_average,
             'city_grade': 'A' if city_average >= 80 else 'B+',
-            'zones': AreaCleanlinessIndexSerializer(indexes, many=True).data,
+            'zones': zones_data,
+            'results': zones_data,
             'formula_explanation': 'Composite index = (Resolution Speed × 25%) + (Recurrence Prevention × 25%) + (Pickup Reliability × 20%) + (Report Frequency × 15%) + (Citizen Satisfaction × 15%)'
         })
 
@@ -155,12 +180,31 @@ class PublicTransparencyView(APIView):
             for r in public_reports
         ]
 
+        total = WasteReport.objects.count()
+        resolved = WasteReport.objects.filter(status__in=['RESOLVED', 'CITIZEN_VERIFIED']).count()
+        active = WasteReport.objects.filter(status__in=['REPORTED', 'ASSIGNED', 'IN_PROGRESS']).count()
+        pct = round(resolved / total * 100) if total else 0
+
+        # Real average resolution time (no hardcoded stats)
+        secs = count = 0
+        for created, done in WasteReport.objects.filter(
+            resolved_at__isnull=False
+        ).values_list('created_at', 'resolved_at')[:500]:
+            if created and done:
+                secs += (done - created).total_seconds()
+                count += 1
+        avg_resolution = f"{secs / count / 3600:.1f} hours" if count else "Not enough data"
+
         return Response({
+            # Flat keys read by PublicTransparency.jsx
+            'total_reports_count': total,
+            'resolved_percentage': f'{pct}%',
+            'resolved_reports_count': resolved,
             'summary': {
-                'total_public_reports': WasteReport.objects.count(),
-                'resolved_issues': WasteReport.objects.filter(status__in=['RESOLVED', 'CITIZEN_VERIFIED']).count(),
-                'active_incidents': WasteReport.objects.filter(status__in=['REPORTED', 'ASSIGNED', 'IN_PROGRESS']).count(),
-                'avg_resolution_time': '4.2 hours',
+                'total_public_reports': total,
+                'resolved_issues': resolved,
+                'active_incidents': active,
+                'avg_resolution_time': avg_resolution,
                 'active_hotspots': hotspots.count()
             },
             'reports': clean_reports,

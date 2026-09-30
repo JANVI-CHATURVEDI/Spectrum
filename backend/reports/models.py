@@ -70,6 +70,13 @@ class WasteReport(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True)
+    
+    # AI Cleanup Verification
+    after_image = models.ImageField(upload_to='reports/after/%Y/%m/', null=True, blank=True)
+    after_image_url = models.URLField(max_length=1000, blank=True, default='')
+    cleanup_score = models.IntegerField(default=0)
+    cleanup_verified = models.BooleanField(default=False)
+    cleanup_verdict = models.CharField(max_length=200, blank=True, default='')
 
     class Meta:
         ordering = ['-priority_score', '-created_at']

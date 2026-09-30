@@ -81,16 +81,20 @@ class SubmitEvidenceView(APIView):
             except Incident.DoesNotExist:
                 pass
 
-        # Update associated task assignments
-        TaskAssignment.objects.filter(
-            report_id=report_id,
-            status__in=['ASSIGNED', 'IN_PROGRESS']
-        ).update(status='COMPLETED', completed_at=now)
+        # Update associated task assignments.
+        # Guarded: filtering on `report_id=None` would otherwise match EVERY
+        # incident-only assignment and mark unrelated work as completed.
+        if report_id:
+            TaskAssignment.objects.filter(
+                report_id=report_id,
+                status__in=['ASSIGNED', 'IN_PROGRESS']
+            ).update(status='COMPLETED', completed_at=now)
 
-        TaskAssignment.objects.filter(
-            incident_id=incident_id,
-            status__in=['ASSIGNED', 'IN_PROGRESS']
-        ).update(status='COMPLETED', completed_at=now)
+        if incident_id:
+            TaskAssignment.objects.filter(
+                incident_id=incident_id,
+                status__in=['ASSIGNED', 'IN_PROGRESS']
+            ).update(status='COMPLETED', completed_at=now)
 
         return Response({
             'message': 'Resolution evidence recorded. Status transitioned to RESOLVED awaiting citizen verification.',

@@ -19,6 +19,7 @@ class WasteReportSerializer(serializers.ModelSerializer):
     category_details = WasteCategorySerializer(source='category', read_only=True)
     citizen_details = UserSerializer(source='citizen', read_only=True)
     citizen_verification = CitizenVerificationSerializer(read_only=True)
+    verification = CitizenVerificationSerializer(source='citizen_verification', read_only=True)
     duplicates_count = serializers.IntegerField(source='duplicates.count', read_only=True)
 
     class Meta:
@@ -28,6 +29,8 @@ class WasteReportSerializer(serializers.ModelSerializer):
             'title', 'description', 'image', 'image_url', 'latitude', 'longitude',
             'address', 'zone', 'severity', 'status', 'priority_score', 'priority_level',
             'priority_factors', 'is_duplicate', 'duplicate_of', 'duplicates_count',
-            'citizen_verification', 'created_at', 'updated_at', 'resolved_at', 'verified_at'
+            'citizen_verification', 'verification', 'after_image', 'after_image_url',
+            'cleanup_score', 'cleanup_verified', 'cleanup_verdict',
+            'created_at', 'updated_at', 'resolved_at', 'verified_at'
         ]
         read_only_fields = ['id', 'priority_score', 'priority_level', 'priority_factors', 'created_at', 'updated_at']

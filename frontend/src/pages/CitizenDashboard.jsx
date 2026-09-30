@@ -25,6 +25,8 @@ export default function CitizenDashboard() {
   const [duplicateWarning, setDuplicateWarning] = useState(null);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiSummary, setAiSummary] = useState(null);
+  const [photo, setPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Pickup Creation State
@@ -63,14 +65,18 @@ export default function CitizenDashboard() {
   }, []);
 
   // Quick Duplicate & AI Check when location or description changes
-  const handleAiAssistance = async () => {
-    if (!description && !title) return;
+  const handleAiAssistance = async (customPhoto = null) => {
+    const photoToUse = customPhoto || photo;
+    if (!description && !title && !photoToUse) return;
     try {
       setAiAnalyzing(true);
-      const res = await api.post('/api/ai/classify/', {
-        text: `${title} ${description}`,
-        latitude: coords.lat,
-        longitude: coords.lng
+      const payload = new FormData();
+      payload.append('text', `${title} ${description}`.trim());
+      payload.append('latitude', coords.lat);
+      payload.append('longitude', coords.lng);
+      if (photoToUse) payload.append('image', photoToUse);
+      const res = await api.post('/api/ai/classify/', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (res.data) {
         setAiSummary(res.data);
@@ -87,13 +93,26 @@ export default function CitizenDashboard() {
     }
   };
 
+  const handlePhotoSelect = (file) => {
+    setPhoto(file || null);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setPhotoPreview(ev.target.result);
+      reader.readAsDataURL(file);
+      handleAiAssistance(file);
+    } else {
+      setPhotoPreview(null);
+    }
+  };
+
   const handleLocationSelect = async (lat, lng) => {
     setCoords({ lat, lng });
     // Check duplicates
     try {
       const dupRes = await api.get(`/api/reports/check-duplicate/?latitude=${lat}&longitude=${lng}&radius_meters=100`);
-      if (dupRes.data?.has_duplicate) {
-        setDuplicateWarning(dupRes.data.existing_reports[0]);
+      const dup = dupRes.data?.existing_reports?.[0] || dupRes.data?.nearby_incidents?.[0];
+      if (dupRes.data?.has_duplicate && dup) {
+        setDuplicateWarning(dup);
       } else {
         setDuplicateWarning(null);
       }
@@ -106,19 +125,24 @@ export default function CitizenDashboard() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.post('/api/reports/', {
-        title,
-        description,
-        category: category || (categories[0]?.id || 1),
-        severity,
-        latitude: coords.lat,
-        longitude: coords.lng,
-        address: address || 'Current pinned location',
+      const payload = new FormData();
+      payload.append('title', title);
+      payload.append('description', description);
+      payload.append('category', category || (categories[0]?.id || 1));
+      payload.append('severity', severity);
+      payload.append('latitude', coords.lat);
+      payload.append('longitude', coords.lng);
+      payload.append('address', address || 'Current pinned location');
+      if (photo) payload.append('image', photo);
+
+      await api.post('/api/reports/', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       setTitle('');
       setDescription('');
       setAddress('');
       setAiSummary(null);
+      handlePhotoSelect(null);
       setViewTab('reports');
       fetchData();
     } catch (err) {
@@ -138,7 +162,8 @@ export default function CitizenDashboard() {
         latitude: coords.lat,
         longitude: coords.lng,
         address: pickupAddress || 'User Home Address',
-        preferred_time: preferredTime || 'Morning (9 AM - 12 PM)',
+        preferred_slot: preferredTime || 'Morning (9:00 AM - 12:00 PM)',
+        preferred_time: preferredTime || 'Morning (9:00 AM - 12:00 PM)',
       });
       setPickupAddress('');
       setViewTab('pickups');
@@ -287,7 +312,7 @@ export default function CitizenDashboard() {
                 <button
                   type="button"
                   onClick={handleAiAssistance}
-                  disabled={aiAnalyzing || (!title && !description)}
+                  disabled={aiAnalyzing || (!title && !description && !photo)}
                   className="flex items-center gap-1 text-xs text-emerald-700 font-semibold hover:text-emerald-800"
                 >
                   <Sparkles className="w-3.5 h-3.5" /> {aiAnalyzing ? 'Analyzing with AI...' : 'AI Auto-Classify'}
@@ -302,13 +327,69 @@ export default function CitizenDashboard() {
               ></textarea>
             </div>
 
+            {/* Photo evidence upload - powers Gemini vision triage */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Photo Evidence <span className="font-normal text-slate-400">(optional, improves AI accuracy)</span>
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handlePhotoSelect(e.target.files?.[0] || null)}
+                  className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                />
+                {photoPreview && (
+                  <button
+                    type="button"
+                    onClick={() => handlePhotoSelect(null)}
+                    className="text-[11px] text-rose-600 font-semibold whitespace-nowrap"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {photoPreview && (
+                <img src={photoPreview} alt="Preview" className="mt-2 h-24 rounded-lg border border-slate-200 object-cover" />
+              )}
+            </div>
+
             {aiSummary && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs space-y-1">
-                <div className="font-semibold text-emerald-900 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5" /> AI Suggestion:
+                <div className="font-semibold text-emerald-900 flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" /> AI Suggestion:
+                  </span>
+                  {aiSummary.ai_suggested && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wide">
+                      AI suggested - you can override
+                    </span>
+                  )}
+                  <span className="text-[10px] font-medium text-emerald-600 bg-white/70 px-1.5 py-0.5 rounded">
+                    {aiSummary.source === 'gemini_vision' ? 'Vision' : aiSummary.source === 'gemini' ? 'Gemini' : 'Heuristic fallback'}
+                    {aiSummary.confidence ? ` · ${Math.round(aiSummary.confidence * 100)}%` : ''}
+                  </span>
                 </div>
                 <div className="text-emerald-800">{aiSummary.summary || 'Classified from text'}</div>
-                <div className="text-emerald-700 text-[11px]">Recommended Severity: <strong>{aiSummary.suggested_severity || severity}</strong></div>
+                <div className="text-emerald-700 text-[11px]">
+                  Recommended Severity: <strong>{aiSummary.suggested_severity || severity}</strong>
+                  {' · '}Category: <strong>{aiSummary.suggested_category_name || 'Mixed waste'}</strong>
+                  {aiSummary.estimated_volume && (<> {' · '}Est. volume: <strong>{aiSummary.estimated_volume}</strong></>)}
+                </div>
+                {Array.isArray(aiSummary.hazard_flags) && aiSummary.hazard_flags.filter(h => h && h !== 'none').length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {aiSummary.hazard_flags.filter(h => h && h !== 'none').map((h) => (
+                      <span key={h} className="px-2 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold uppercase">
+                        ⚠ {h.replace('_', ' ')}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {aiSummary.translated_text && (
+                  <div className="text-[11px] text-emerald-600 border-t border-emerald-200 pt-1">
+                    Translated from {aiSummary.detected_language}: "{aiSummary.translated_text}"
+                  </div>
+                )}
               </div>
             )}
 
@@ -474,7 +555,7 @@ export default function CitizenDashboard() {
                   <PriorityBadge level={r.priority_level} score={r.priority_score} factors={r.priority_factors} />
 
                   {/* Citizen Verification prompt if resolved */}
-                  {r.status === 'RESOLVED' && !r.verification && (
+                  {r.status === 'RESOLVED' && !(r.citizen_verification || r.verification) && (
                     <button
                       onClick={() => setVerifyingReport(r)}
                       className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
@@ -482,7 +563,7 @@ export default function CitizenDashboard() {
                       Confirm Cleanup
                     </button>
                   )}
-                  {r.verification && (
+                  {(r.citizen_verification || r.verification) && (
                     <span className="text-[11px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-1 rounded">
                       ✓ Verified by Citizen
                     </span>
@@ -514,7 +595,7 @@ export default function CitizenDashboard() {
                     <span className="font-bold text-slate-900 text-sm">Pickup #{p.id} - {p.waste_type}</span>
                     <StatusBadge status={p.status} />
                   </div>
-                  <div className="text-xs text-slate-600">Volume: <strong>{p.estimated_volume}</strong> • Slot: {p.preferred_time}</div>
+                  <div className="text-xs text-slate-600">Volume: <strong>{p.estimated_volume}</strong> • Slot: {p.preferred_slot || p.preferred_time}</div>
                   <div className="text-[11px] text-slate-400">📍 {p.address}</div>
                 </div>
               </div>

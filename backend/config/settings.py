@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
+    'storages',
     
     # Third party apps
     'rest_framework',
@@ -82,23 +83,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+import sys
 # Database
+# Uses in-memory SQLite when running tests for high speed & isolation
 # Uses Neon PostgreSQL if DATABASE_URL is set; falls back to SQLite for local development
-DATABASE_URL = (os.getenv('DATABASE_URL') or '').strip()
-if DATABASE_URL:
-    # Neon refuses plain (non-SSL) connections - enforce sslmode unless already set
-    if 'sslmode=' not in DATABASE_URL:
-        DATABASE_URL += ('&' if '?' in DATABASE_URL else '?') + 'sslmode=require'
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
-    }
-else:
+if 'test' in sys.argv:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': ':memory:',
         }
     }
+else:
+    DATABASE_URL = (os.getenv('DATABASE_URL') or '').strip()
+    if DATABASE_URL:
+        # Neon refuses plain (non-SSL) connections - enforce sslmode unless already set
+        if 'sslmode=' not in DATABASE_URL:
+            DATABASE_URL += ('&' if '?' in DATABASE_URL else '?') + 'sslmode=require'
+        DATABASES = {
+            'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+        }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -120,11 +131,48 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# ---- Where uploaded photos go -------------------------------------------
+# Neon Postgres stores rows, not binaries. When the branch's S3-compatible
+# bucket credentials are present, uploads go to Neon Object Storage so files
+# branch together with the database and survive Render's ephemeral disk.
+# Without them we fall back to local MEDIA_ROOT so dev never needs the network.
+AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', '').strip()
+AWS_S3_ENDPOINT_URL = os.getenv('AWS_ENDPOINT_URL_S3', '').strip()
+USE_NEON_OBJECT_STORAGE = bool(
+    AWS_STORAGE_BUCKET_NAME
+    and AWS_S3_ENDPOINT_URL
+    and os.getenv('AWS_ACCESS_KEY_ID', '').strip()
+    and os.getenv('AWS_SECRET_ACCESS_KEY', '').strip()
+)
+
+if USE_NEON_OBJECT_STORAGE:
+    AWS_S3_REGION_NAME = os.getenv('AWS_REGION', 'us-east-2')
+    AWS_S3_USE_SSL = AWS_S3_ENDPOINT_URL.startswith('https://')
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    # Keep filenames unique rather than overwriting on re-upload
+    AWS_S3_FILE_OVERWRITE = False
+    # Neon buckets are private by default; presigned reads work either way
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=3600'}
+
+STORAGES = {
+    'default': {
+        'BACKEND': (
+            'storages.backends.s3.S3Storage'
+            if USE_NEON_OBJECT_STORAGE else
+            'django.core.files.storage.FileSystemStorage'
+        ),
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

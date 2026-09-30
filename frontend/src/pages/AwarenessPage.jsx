@@ -29,25 +29,50 @@ export default function AwarenessPage() {
     fetchAwareness();
   }, []);
 
-  const handleAnswer = (optionIndex) => {
+  const [answerFeedback, setAnswerFeedback] = useState(null);
+
+  const handleAnswer = async (optionIndex) => {
     setSelectedAnswer(optionIndex);
     const currentQ = quizzes[currentQuizIndex];
-    if (optionIndex === currentQ?.correct_index) {
-      setQuizScore(prev => prev + 1);
+    if (!currentQ) return;
+
+    try {
+      const res = await api.post(`/api/awareness/quiz/${currentQ.id}/check/`, {
+        selected_option_index: optionIndex
+      });
+      const isCorrect = res.data?.is_correct;
+      const correctIndex = res.data?.correct_option_index;
+      setAnswerFeedback({
+        isCorrect,
+        correctIndex,
+        explanation: res.data?.explanation
+      });
+      if (isCorrect) {
+        setQuizScore(prev => prev + 1);
+      }
+    } catch (e) {
+      console.error('Quiz check failed:', e);
+      // Fallback if network issue
+      const isCorrect = optionIndex === currentQ?.correct_index;
+      setAnswerFeedback({ isCorrect, correctIndex: currentQ?.correct_index });
+      if (isCorrect) setQuizScore(prev => prev + 1);
     }
+
     setTimeout(() => {
       if (currentQuizIndex + 1 < quizzes.length) {
         setCurrentQuizIndex(prev => prev + 1);
         setSelectedAnswer(null);
+        setAnswerFeedback(null);
       } else {
         setQuizFinished(true);
       }
-    }, 1200);
+    }, 1800);
   };
 
   const restartQuiz = () => {
     setCurrentQuizIndex(0);
     setSelectedAnswer(null);
+    setAnswerFeedback(null);
     setQuizScore(0);
     setQuizFinished(false);
   };
@@ -103,10 +128,12 @@ export default function AwarenessPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(quizzes[currentQuizIndex]?.options || []).map((opt, i) => {
                 const isSelected = selectedAnswer === i;
-                const isCorrect = i === quizzes[currentQuizIndex]?.correct_index;
+                const isCorrect = answerFeedback ? answerFeedback.correctIndex === i : (i === quizzes[currentQuizIndex]?.correct_index);
                 let btnStyle = 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100';
                 if (isSelected) {
-                  btnStyle = isCorrect ? 'bg-emerald-500 text-white font-bold' : 'bg-rose-500 text-white font-bold';
+                  btnStyle = (answerFeedback?.isCorrect ?? isCorrect) ? 'bg-emerald-500 text-white font-bold' : 'bg-rose-500 text-white font-bold';
+                } else if (answerFeedback && isCorrect) {
+                  btnStyle = 'bg-emerald-100 border-emerald-400 text-emerald-800 font-semibold';
                 }
                 return (
                   <button
@@ -116,11 +143,16 @@ export default function AwarenessPage() {
                     className={`p-3 text-left border rounded-xl text-xs transition flex items-center justify-between ${btnStyle}`}
                   >
                     <span>{opt}</span>
-                    {isSelected && (isCorrect ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />)}
+                    {isSelected && ((answerFeedback?.isCorrect ?? isCorrect) ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />)}
                   </button>
                 );
               })}
             </div>
+            {answerFeedback?.explanation && (
+              <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-900 rounded-xl text-xs animate-in fade-in">
+                <strong>Explanation:</strong> {answerFeedback.explanation}
+              </div>
+            )}
           </div>
         ) : quizFinished ? (
           <div className="p-6 text-center space-y-3">

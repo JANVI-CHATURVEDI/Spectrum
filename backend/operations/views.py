@@ -135,10 +135,54 @@ class TransitionTaskStatusView(APIView):
 
         elif new_status == 'COMPLETED':
             task.completed_at = now
+            notes = request.data.get('notes', '')
+            if notes:
+                task.notes = notes
+
+            after_image = request.FILES.get('after_image')
+            after_image_url = request.data.get('after_image_url', '')
+
             if task.report:
                 task.report.status = 'RESOLVED'
                 task.report.resolved_at = now
-                task.report.save(update_fields=['status', 'resolved_at'])
+                if after_image:
+                    task.report.after_image = after_image
+                elif after_image_url:
+                    task.report.after_image_url = after_image_url
+
+                # AI cleanup verification comparison
+                from ai_service.service import AIService
+                before_bytes = None
+                if task.report.image:
+                    try:
+                        before_bytes = task.report.image.read()
+                    except Exception:
+                        pass
+                after_bytes = None
+                if after_image:
+                    try:
+                        after_bytes = after_image.read()
+                        after_image.seek(0)
+                    except Exception:
+                        pass
+
+                verification_res = AIService.compare_cleanup(before_bytes, after_bytes, notes=notes)
+                task.report.cleanup_score = verification_res.get('cleanup_score', 85 if after_image or after_image_url else 0)
+                task.report.cleanup_verified = verification_res.get('verified', bool(after_image or after_image_url))
+                task.report.cleanup_verdict = verification_res.get('verdict', 'Cleanup verified by worker evidence')
+                task.report.save()
+
+                # Also log to Evidence model
+                from incidents.models import Evidence
+                Evidence.objects.create(
+                    report=task.report,
+                    worker=task.worker,
+                    before_image_url=task.report.image_url or (task.report.image.url if task.report.image else ''),
+                    after_image=after_image,
+                    after_image_url=after_image_url or (task.report.after_image.url if task.report.after_image else ''),
+                    notes=notes or 'Completed by field sanitation team'
+                )
+
             if task.incident:
                 task.incident.status = 'RESOLVED'
                 task.incident.resolved_at = now
@@ -179,10 +223,13 @@ class SupervisorTeamSummaryView(APIView):
             team_stats.append({
                 'id': w.id,
                 'name': w.get_full_name() or w.username,
-                'zone': w.zone,
+                'username': w.username,
+                'zone': w.zone or 'Central Ward',
+                'ward': w.zone or 'Central Ward',
                 'phone': w.phone,
                 'total_tasks': tasks.count(),
                 'active_tasks': active_count,
+                'active_tasks_count': active_count,
                 'completed_today': completed_count,
                 'overdue_tasks': overdue_count,
                 'status': 'Busy' if active_count >= 3 else ('Available' if active_count == 0 else 'On Route')
@@ -193,16 +240,24 @@ class SupervisorTeamSummaryView(APIView):
             status__in=['REPORTED', 'ASSIGNED', 'IN_PROGRESS'],
             created_at__lte=overdue_threshold
         ).count()
+        in_progress_tasks = TaskAssignment.objects.filter(status='IN_PROGRESS').count()
+        completed_today = TaskAssignment.objects.filter(
+            status='COMPLETED',
+            completed_at__date=now.date()
+        ).count()
+
+        summary_data = {
+            'total_workers': workers.count(),
+            'in_progress_tasks': in_progress_tasks,
+            'pending_incidents': pending_incidents,
+            'overdue_incidents': overdue_incidents,
+            'completed_today': completed_today,
+        }
 
         return Response({
+            'total_workers': workers.count(),
+            'in_progress_tasks': in_progress_tasks,
+            'workers_status': team_stats,
             'team': team_stats,
-            'summary': {
-                'total_workers': workers.count(),
-                'pending_incidents': pending_incidents,
-                'overdue_incidents': overdue_incidents,
-                'completed_today': TaskAssignment.objects.filter(
-                    status='COMPLETED',
-                    completed_at__date=now.date()
-                ).count()
-            }
+            'summary': summary_data,
         })

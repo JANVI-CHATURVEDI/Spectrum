@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [reports, setReports] = useState([]);
   const [hotspots, setHotspots] = useState([]);
   const [aiInsights, setAiInsights] = useState(null);
+  const [forecast, setForecast] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // NL Search
@@ -21,15 +22,17 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [ovRes, clRes, repRes, hotRes, aiRes] = await Promise.all([
+      const [ovRes, clRes, repRes, hotRes, aiRes, forecastRes] = await Promise.all([
         api.get('/api/analytics/overview/').catch(() => ({ data: null })),
         api.get('/api/analytics/cleanliness-index/').catch(() => ({ data: [] })),
         api.get('/api/reports/'),
         api.get('/api/hotspots/'),
         api.get('/api/ai/insights/').catch(() => ({ data: null })),
+        api.get('/api/ai/forecast/').catch(() => ({ data: null })),
       ]);
+      setForecast(forecastRes.data);
       setOverview(ovRes.data);
-      setCleanliness(clRes.data?.results || clRes.data || []);
+      setCleanliness(clRes.data?.zones || clRes.data?.results || (Array.isArray(clRes.data) ? clRes.data : []));
       setReports(repRes.data?.results || repRes.data || []);
       setHotspots(hotRes.data?.results || hotRes.data || []);
       setAiInsights(aiRes.data);
@@ -136,29 +139,57 @@ export default function AdminDashboard() {
       {/* AI Policy & Action Recommendations */}
       {aiInsights && (
         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/80 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
             <Sparkles className="w-5 h-5 text-emerald-700" />
             <h3 className="font-bold text-slate-900 text-base">Municipal AI Intelligence & Operational Advice</h3>
+            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white border border-emerald-200 text-emerald-700">
+              {aiInsights.source === 'gemini' ? 'Gemini' : 'Heuristic fallback'}
+            </span>
+            {aiInsights.cached && (
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-500">
+                cached 15m
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-700 leading-relaxed mb-4">
-            {aiInsights.summary || "High recurrence detected in Central Ward sector 4 due to commercial market packaging. Recommended action: install an automated compactor bin and increase morning route frequency."}
+            {aiInsights.summary || "No insights generated yet."}
           </p>
+
+          {/* Real aggregated numbers behind the advice */}
+          {aiInsights.stats && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-center">
+              {[
+                { label: 'This week', value: aiInsights.stats.reports_this_week },
+                { label: 'vs last week', value: `${aiInsights.stats.week_over_week_pct > 0 ? '+' : ''}${aiInsights.stats.week_over_week_pct}%` },
+                { label: 'Avg resolution', value: `${aiInsights.stats.avg_resolution_hours}h` },
+                { label: 'Overdue >6h', value: aiInsights.stats.overdue_reports },
+              ].map((s) => (
+                <div key={s.label} className="p-2 bg-white/80 rounded-xl border border-emerald-100">
+                  <div className="text-sm font-black text-slate-900">{s.value}</div>
+                  <div className="text-[10px] text-slate-500 uppercase font-semibold">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div className="p-3 bg-white/80 rounded-xl border border-emerald-100">
-              <span className="text-[10px] font-bold text-emerald-700 uppercase">Action 1</span>
-              <div className="font-semibold text-slate-900 mt-0.5">Deploy Smart Sensor Bin</div>
-              <div className="text-[11px] text-slate-500">Targeting Sector 9 market junction</div>
-            </div>
-            <div className="p-3 bg-white/80 rounded-xl border border-teal-100">
-              <span className="text-[10px] font-bold text-teal-700 uppercase">Action 2</span>
-              <div className="font-semibold text-slate-900 mt-0.5">Route Frequency Shift</div>
-              <div className="text-[11px] text-slate-500">Advance morning sweep to 6:30 AM</div>
-            </div>
-            <div className="p-3 bg-white/80 rounded-xl border border-blue-100">
-              <span className="text-[10px] font-bold text-blue-700 uppercase">Action 3</span>
-              <div className="font-semibold text-slate-900 mt-0.5">Citizen Segregation Drive</div>
-              <div className="text-[11px] text-slate-500">Reward top community verifiers</div>
-            </div>
+            {(aiInsights.actions?.length ? aiInsights.actions : [
+              { title: 'Deploy Smart Sensor Bin', detail: 'Targeting the busiest market junction', priority: 'HIGH' },
+              { title: 'Route Frequency Shift', detail: 'Advance morning sweep to 6:30 AM', priority: 'MEDIUM' },
+              { title: 'Citizen Segregation Drive', detail: 'Reward top community verifiers', priority: 'LOW' },
+            ]).map((a, i) => (
+              <div key={i} className={`p-3 bg-white/80 rounded-xl border ${
+                a.priority === 'HIGH' ? 'border-rose-200' : a.priority === 'MEDIUM' ? 'border-teal-200' : 'border-blue-200'
+              }`}>
+                <span className={`text-[10px] font-bold uppercase ${
+                  a.priority === 'HIGH' ? 'text-rose-600' : a.priority === 'MEDIUM' ? 'text-teal-600' : 'text-blue-600'
+                }`}>
+                  Action {i + 1}{a.priority ? ` · ${a.priority}` : ''}
+                </span>
+                <div className="font-semibold text-slate-900 mt-0.5">{a.title}</div>
+                <div className="text-[11px] text-slate-500">{a.detail}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -208,6 +239,43 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* AI-powered 48h hotspot overflow forecast */}
+      {forecast && forecast.forecasts?.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+              <AlertOctagon className="w-4 h-4 text-rose-600" />
+              Predicted Overflow Risk — next {forecast.horizon_hours}h
+            </h3>
+            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
+              {forecast.likely_count} likely to overflow
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500 mb-4">Method: {forecast.method}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            {forecast.forecasts.slice(0, 6).map((f, i) => (
+              <div key={i} className={`p-3 rounded-xl border ${
+                f.likely_to_overflow ? 'border-rose-200 bg-rose-50/60' : 'border-slate-200 bg-slate-50/60'
+              }`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-slate-900">{f.zone || 'Unknown zone'}</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                    f.likely_to_overflow ? 'bg-rose-600 text-white' : 'bg-slate-300 text-slate-700'
+                  }`}>{f.risk_score}</span>
+                </div>
+                <div className="text-[11px] text-slate-600 mb-1">
+                  {f.open_reports} open · {f.critical_reports} critical · oldest {f.oldest_age_hours}h
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">{f.explanation}</p>
+                <div className={`mt-1.5 text-[11px] font-semibold ${f.likely_to_overflow ? 'text-rose-700' : 'text-emerald-700'}`}>
+                  {f.recommendation}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

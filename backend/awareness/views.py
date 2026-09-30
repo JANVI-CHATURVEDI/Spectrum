@@ -28,7 +28,16 @@ class QuizAnswerCheckView(APIView):
         except QuizQuestion.DoesNotExist:
             return Response({'error': 'Quiz question not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        selected = int(request.data.get('selected_option_index', -1))
+        selected_val = request.data.get('selected_option_index')
+        if selected_val is None:
+            selected_val = request.data.get('selected_index')
+        if selected_val is None:
+            selected_val = request.data.get('option_index', -1)
+        try:
+            selected = int(selected_val)
+        except (ValueError, TypeError):
+            selected = -1
+
         is_correct = (selected == q.correct_option_index)
 
         return Response({

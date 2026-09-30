@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import StatusBadge from './StatusBadge';
@@ -12,8 +12,8 @@ const createCustomIcon = (color, label = '') => {
     html: `
       <div style="
         background-color: ${color};
-        width: 28px;
-        height: 28px;
+        width: 30px;
+        height: 30px;
         border-radius: 50% 50% 50% 0;
         transform: rotate(-45deg);
         border: 2px solid white;
@@ -23,17 +23,19 @@ const createCustomIcon = (color, label = '') => {
         justify-content: center;
       ">
         <div style="
-          width: 8px;
-          height: 8px;
-          background: white;
-          border-radius: 50%;
           transform: rotate(45deg);
-        "></div>
+          color: white;
+          font-weight: 800;
+          font-size: 11px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">${label || '<span style="width:6px;height:6px;background:white;border-radius:50%;display:block;"></span>'}</div>
       </div>
     `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 28],
-    popupAnchor: [0, -28],
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+    popupAnchor: [0, -30],
   });
 };
 
@@ -66,6 +68,7 @@ export default function MapView({
   items = [],
   hotspots = [],
   pickups = [],
+  routePolyline = null,
   selectedLocation = null,
   onLocationSelect = null,
   height = '500px',
@@ -151,12 +154,20 @@ export default function MapView({
             </React.Fragment>
           ))}
 
+        {/* Route Polyline for Worker Navigation */}
+        {routePolyline && routePolyline.length > 1 && (
+          <Polyline
+            positions={routePolyline}
+            pathOptions={{ color: '#0284c7', weight: 4, dashArray: '6, 8', opacity: 0.85 }}
+          />
+        )}
+
         {/* Normal Incident & Waste Report Markers */}
         {items.map((item) => (
           <Marker
             key={`report-${item.id}`}
             position={[item.latitude, item.longitude]}
-            icon={createCustomIcon(getMarkerColor(item))}
+            icon={createCustomIcon(getMarkerColor(item), item.route_order || item.marker_label || '')}
             eventHandlers={{
               click: () => onItemClick && onItemClick(item),
             }}

@@ -8,6 +8,7 @@ class PickupRequest(models.Model):
         ('E_WASTE', 'Electronic Waste'),
         ('GARDEN', 'Garden / Pruning Waste'),
         ('CONSTRUCTION', 'Construction Waste'),
+        ('HAZARDOUS', 'Hazardous Waste'),
         ('OTHER', 'Other Specialized Waste'),
     ]
 

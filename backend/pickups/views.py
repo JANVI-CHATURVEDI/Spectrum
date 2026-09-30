@@ -32,4 +32,16 @@ class PickupRequestViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         citizen = self.request.user if self.request.user.is_authenticated else User.objects.filter(role='CITIZEN').first()
+        if citizen is None:
+            # PickupRequest.citizen is NOT NULL - never let an anonymous
+            # request on an unseeded DB blow up with an IntegrityError.
+            citizen, _ = User.objects.get_or_create(
+                username='guest_citizen',
+                defaults={
+                    'email': 'guest@swachdrishti.local',
+                    'role': 'CITIZEN',
+                    'first_name': 'Guest',
+                    'last_name': 'Citizen',
+                },
+            )
         serializer.save(citizen=citizen)

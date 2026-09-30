@@ -89,7 +89,7 @@ export default function PublicTransparency() {
               </div>
               <div className="flex items-center gap-3">
                 <StatusBadge status={report.status} />
-                {report.verification ? (
+                {(report.citizen_verification || report.verification) ? (
                   <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded text-[11px] font-semibold border border-emerald-200">
                     ✓ Verified by Resident
                   </span>

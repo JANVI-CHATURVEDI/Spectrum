@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import WasteCategoryListView, CheckDuplicateReportView, WasteReportViewSet, CitizenVerificationView
 
 router = DefaultRouter()
-router.register(r'incidents', WasteReportViewSet, basename='reports')
+router.register(r'incidents', WasteReportViewSet, basename='reports-incidents')
+router.register(r'', WasteReportViewSet, basename='reports')
 
 urlpatterns = [
     path('categories/', WasteCategoryListView.as_view(), name='category-list'),
