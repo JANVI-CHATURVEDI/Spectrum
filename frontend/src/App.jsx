@@ -37,10 +37,10 @@ function App() {
         <main className="flex-1 bg-gray-50">
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/citizen" element={role === 'CITIZEN' ? <CitizenDashboard /> : <Navigate to="/" replace />} />
-            <Route path="/worker" element={role === 'WORKER' ? <WorkerDashboard /> : <Navigate to="/" replace />} />
-            <Route path="/supervisor" element={role === 'SUPERVISOR' ? <SupervisorDashboard /> : <Navigate to="/" replace />} />
-            <Route path="/admin" element={role === 'ADMIN' ? <AdminDashboard /> : <Navigate to="/" replace />} />
+            <Route path="/citizen" element={<CitizenDashboard />} />
+            <Route path="/worker" element={<WorkerDashboard />} />
+            <Route path="/supervisor" element={<SupervisorDashboard />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/public" element={<PublicTransparency />} />
             <Route path="/awareness" element={<AwarenessPage />} />
           </Routes>
