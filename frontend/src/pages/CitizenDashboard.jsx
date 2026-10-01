@@ -28,6 +28,15 @@ export default function CitizenDashboard() {
   const [viewTab, setViewTab] = useState('reports');
   const [openReport, setOpenReport] = useState(null);
   const [brokenPhotoId, setBrokenPhotoId] = useState(null);
+  const [mapFocus, setMapFocus] = useState(null);
+
+  const openReportDetail = (r) => {
+    setBrokenPhotoId(null);
+    setOpenReport(r);
+    if (r && Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))) {
+      setMapFocus({ lat: Number(r.latitude), lng: Number(r.longitude), key: Date.now() });
+    }
+  };
 
   const [title, setTitle] = useState(() => loadJSON(REPORT_DRAFT_KEY, {}).title || '');
   const [description, setDescription] = useState(() => loadJSON(REPORT_DRAFT_KEY, {}).description || '');
@@ -394,6 +403,7 @@ export default function CitizenDashboard() {
           hotspots={hotspots}
           selectedLocation={coords}
           onLocationSelect={handleLocationSelect}
+          focusRequest={mapFocus}
         />
       </div>
 
@@ -761,8 +771,8 @@ export default function CitizenDashboard() {
                 key={r.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => { setBrokenPhotoId(null); setOpenReport(r); }}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setBrokenPhotoId(null); setOpenReport(r); } }}
+                onClick={() => openReportDetail(r)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openReportDetail(r); } }}
                 title="Open issue details"
                 className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-emerald-50/40 focus:bg-emerald-50/60 focus:outline-none transition cursor-pointer group"
               >

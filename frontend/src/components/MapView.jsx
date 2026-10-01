@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import StatusBadge from './StatusBadge';
@@ -60,6 +60,16 @@ function LocationPickerEvents({ onLocationSelect }) {
   return null;
 }
 
+function MapFocus({ focusRequest }) {
+  const map = useMap();
+  useEffect(() => {
+    if (focusRequest && Number.isFinite(focusRequest.lat) && Number.isFinite(focusRequest.lng)) {
+      map.flyTo([focusRequest.lat, focusRequest.lng], Math.max(map.getZoom(), 15), { duration: 0.8 });
+    }
+  }, [focusRequest, map]);
+  return null;
+}
+
 export default function MapView({
   center = [28.6280, 77.2180],
   zoom = 13,
@@ -72,6 +82,7 @@ export default function MapView({
   height = '500px',
   showHotspots = true,
   onItemClick = null,
+  focusRequest = null,
 }) {
   return (
     <div style={{ height, width: '100%' }} className="relative rounded-xl overflow-hidden border border-slate-200 shadow-sm">
@@ -87,6 +98,7 @@ export default function MapView({
         />
 
         {onLocationSelect && <LocationPickerEvents onLocationSelect={onLocationSelect} />}
+        {focusRequest && <MapFocus focusRequest={focusRequest} />}
 
         {selectedLocation && (
           <Marker

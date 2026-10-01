@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogIn, UserPlus, FlaskConical, AlertCircle } from 'lucide-react';
 
@@ -20,7 +20,7 @@ const QUICK_FILL = [
 ];
 
 export default function Login() {
-  const { login, register, switchRole } = useAuth();
+  const { user, loading, login, register, switchRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState('login');
@@ -82,6 +82,10 @@ export default function Login() {
   };
 
   const inputCls = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none bg-white';
+
+  if (!loading && user) {
+    return <Navigate to={ROLE_HOME[user.role] || '/citizen'} replace />;
+  }
 
   return (
     <div className="max-w-md mx-auto px-4 py-10">

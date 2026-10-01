@@ -33,7 +33,7 @@ export function RequireRole({ roles, children }) {
   if (loading) return <LoadingGate />;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (roles.includes(role) || role === 'ADMIN') return children;
-  return <AccessDenied />;
+  return <Navigate to={ROLE_HOME[role] || '/'} replace />;
 }
 
 export function AccessDenied() {
