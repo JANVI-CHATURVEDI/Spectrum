@@ -52,6 +52,11 @@ class LoginSerializer(serializers.Serializer):
         data['user'] = user
         return data
 
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['email', 'first_name', 'last_name', 'phone', 'zone']
+
 class StaffCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     role = serializers.ChoiceField(choices=[User.ROLE_WORKER, User.ROLE_SUPERVISOR])

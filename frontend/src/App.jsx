@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import PublicTransparency from './pages/PublicTransparency';
 import AwarenessPage from './pages/AwarenessPage';
 import Login from './pages/Login';
+import Profile from './pages/Profile';
 
 function App() {
   const { role, loading } = useAuth();
@@ -40,6 +41,14 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
+            <Route
+              path="/profile"
+              element={
+                <RequireAuth>
+                  <Profile />
+                </RequireAuth>
+              }
+            />
             <Route path="/public" element={<PublicTransparency />} />
             <Route path="/awareness" element={<AwarenessPage />} />
             <Route

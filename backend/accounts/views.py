@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from .models import User
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, StaffCreateSerializer
+from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, StaffCreateSerializer, ProfileUpdateSerializer
 from .permissions import IsSupervisor, IsAdminRole
 
 class RegisterView(generics.CreateAPIView):
@@ -84,6 +84,15 @@ class CurrentUserView(APIView):
             'user': UserSerializer(request.user).data,
             'stats': get_user_stats(request.user),
             'badge_catalog': badge_catalog(),
+        })
+
+    def patch(self, request):
+        serializer = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({
+            'user': UserSerializer(request.user).data,
+            'message': 'Profile updated. Notifications will now reach your new address.'
         })
 
 class WorkersListView(generics.ListAPIView):

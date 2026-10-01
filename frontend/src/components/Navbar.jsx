@@ -224,6 +224,12 @@ export default function Navbar({ activeTab, setActiveTab }) {
                       <span className="block text-[10px] font-bold uppercase tracking-wide text-emerald-700">{role}</span>
                     </div>
                     <button
+                      onClick={() => { setUserOpen(false); handleNav('profile', '/profile'); }}
+                      className="w-full text-left px-3 py-2 flex items-center gap-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      <User className="w-4 h-4" /> Profile & notifications
+                    </button>
+                    <button
                       onClick={handleLogout}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
                     >

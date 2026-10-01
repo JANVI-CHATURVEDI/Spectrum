@@ -168,6 +168,25 @@ class AuthContractTests(ContractTestCase):
         self.assertTrue(any(w['role'] == 'WORKER' for w in res.json()))
 
 
+    def test_profile_update_email(self):
+        token = self.client.post(
+            '/api/auth/login/',
+            {'username': 'contract_citizen', 'password': 'secret123'},
+        ).json()['token']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.patch('/api/auth/me/', {
+            'email': 'real@citizen.com', 'phone': '+911234567890',
+            'first_name': 'Real', 'role': 'ADMIN',
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()['user']['email'], 'real@citizen.com')
+        self.assertEqual(res.json()['user']['role'], 'CITIZEN')
+
+    def test_profile_requires_auth(self):
+        res = self.client.patch('/api/auth/me/', {'email': 'x@y.com'}, format='json')
+        self.assertEqual(res.status_code, 401)
+
+
 class NotificationContractTests(ContractTestCase):
     def _token(self, username):
         return self.client.post(
