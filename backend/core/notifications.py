@@ -118,7 +118,7 @@ def notify_report_submitted(report):
         if not (email or phone):
             return
         link = f'{settings.FRONTEND_URL}/citizen'
-        subject = f'Report #{report.id} received — {report.title[:60]}'
+        subject = f'Report #{report.id} received - {report.title[:60]}'
         body = (
             f'Hi {name},\n\n'
             f'Your report "{report.title}" (#{report.id}) has been received and '
@@ -173,7 +173,7 @@ def notify_verification_outcome(report, is_resolved):
         if not (email or phone):
             return
         if is_resolved:
-            subject = f'Report #{report.id} closed — thank you'
+            subject = f'Report #{report.id} closed - thank you'
             body = (
                 f'Hi {name},\n\n'
                 f'Thanks for verifying "{report.title}" (#{report.id}). '
