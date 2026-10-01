@@ -194,6 +194,11 @@ CSRF_TRUSTED_ORIGINS = [
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 
+# HTTP email API (port 443) — preferred on hosts that block SMTP ports.
+# Without a verified domain Resend delivers only to the account owner's inbox.
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
+RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'SwachDrishti <onboarding@resend.dev>').strip()
+
 EMAIL_BACKEND = (
     'django.core.mail.backends.smtp.EmailBackend'
     if os.getenv('EMAIL_HOST', '').strip() else

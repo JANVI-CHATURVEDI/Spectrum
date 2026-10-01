@@ -12,14 +12,34 @@ def _fire_async(fn, *args, **kwargs):
     threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=True).start()
 
 
+def _send_via_resend(to_email, subject, message):
+    """HTTP email API (port 443) — works where SMTP ports are blocked."""
+    import requests
+
+    api_key = getattr(settings, 'RESEND_API_KEY', '')
+    from_email = getattr(settings, 'RESEND_FROM_EMAIL', '') or 'SwachDrishti <onboarding@resend.dev>'
+    resp = requests.post(
+        'https://api.resend.com/emails',
+        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+        json={'from': from_email, 'to': [to_email], 'subject': subject, 'text': message},
+        timeout=20,
+    )
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f'Resend rejected send: {resp.status_code} {resp.text[:200]}')
+    logger.info('Email sent via Resend to %s: %s', to_email, subject)
+
+
 def send_email_safe(to_email, subject, message):
     if not to_email:
         return False
 
     def _send():
         try:
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [to_email])
-            logger.info('Email sent to %s: %s', to_email, subject)
+            if getattr(settings, 'RESEND_API_KEY', ''):
+                _send_via_resend(to_email, subject, message)
+            else:
+                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [to_email])
+                logger.info('Email sent to %s: %s', to_email, subject)
         except Exception as e:
             logger.warning('Email to %s failed (non-fatal): %s', to_email, e)
 
