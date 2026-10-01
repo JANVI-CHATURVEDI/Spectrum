@@ -314,15 +314,15 @@ class Command(BaseCommand):
         self.stdout.write("-> Seeded waste reports with explainable priorities")
 
         resolved_rep = created_reports[3]
-        evidence, _ = Evidence.objects.get_or_create(
-            report=resolved_rep,
-            defaults={
-                'worker': worker1,
-                'before_image_url': resolved_rep.image_url,
-                'after_image_url': 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80',
-                'notes': 'Route Van 4 completely cleared the bin, swept 10m perimeter, and sprayed disinfectant solution.'
-            }
-        )
+        evidence = Evidence.objects.filter(report=resolved_rep).first()
+        if evidence is None:
+            evidence = Evidence.objects.create(
+                report=resolved_rep,
+                worker=worker1,
+                before_image_url=resolved_rep.image_url,
+                after_image_url='https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80',
+                notes='Route Van 4 completely cleared the bin, swept 10m perimeter, and sprayed disinfectant solution.'
+            )
 
         verified_rep = created_reports[4]
         CitizenVerification.objects.get_or_create(
@@ -345,59 +345,55 @@ class Command(BaseCommand):
             }
         )
 
-        TaskAssignment.objects.get_or_create(
-            report=created_reports[0],
-            defaults={
-                'worker': worker1,
-                'supervisor': supervisor_user,
-                'status': 'ASSIGNED',
-                'priority_level': 'CRITICAL',
-                'notes': 'Immediate dispatch required. Use high-capacity tipper.'
-            }
-        )
-        TaskAssignment.objects.get_or_create(
-            report=created_reports[1],
-            defaults={
-                'worker': worker1,
-                'supervisor': supervisor_user,
-                'status': 'IN_PROGRESS',
-                'priority_level': 'HIGH',
-                'notes': 'Plastic bags collection; bring segregation sacks.'
-            }
-        )
+        if not TaskAssignment.objects.filter(report=created_reports[0]).exists():
+            TaskAssignment.objects.create(
+                report=created_reports[0],
+                worker=worker1,
+                supervisor=supervisor_user,
+                status='ASSIGNED',
+                priority_level='CRITICAL',
+                notes='Immediate dispatch required. Use high-capacity tipper.'
+            )
+        if not TaskAssignment.objects.filter(report=created_reports[1]).exists():
+            TaskAssignment.objects.create(
+                report=created_reports[1],
+                worker=worker1,
+                supervisor=supervisor_user,
+                status='IN_PROGRESS',
+                priority_level='HIGH',
+                notes='Plastic bags collection; bring segregation sacks.'
+            )
         self.stdout.write("-> Seeded worker task assignments")
 
-        PickupRequest.objects.get_or_create(
-            citizen=citizen1,
-            waste_type='BULK',
-            defaults={
-                'estimated_volume': '1 old wooden wardrobe and 2 chairs',
-                'description': 'Old furniture during home renovation, neatly kept in driveway.',
-                'address': 'House 42, Civil Lines Enclave',
-                'latitude': BASE_LAT - 0.007,
-                'longitude': BASE_LNG + 0.006,
-                'zone': 'Zone 2 - North Commercial',
-                'preferred_slot': 'Morning (9:00 AM - 12:00 PM)',
-                'scheduled_date': (now + timedelta(days=1)).date(),
-                'status': 'SCHEDULED',
-                'assigned_worker': worker2
-            }
-        )
-        PickupRequest.objects.get_or_create(
-            citizen=citizen2,
-            waste_type='E_WASTE',
-            defaults={
-                'estimated_volume': '2 CRT monitors, 1 broken UPS, cables',
-                'description': 'Obsolete computer parts from society library.',
-                'address': 'Flat 302, Green Avenue Towers',
-                'latitude': BASE_LAT + 0.006,
-                'longitude': BASE_LNG - 0.008,
-                'zone': 'Zone 1 - Central',
-                'preferred_slot': 'Afternoon (2:00 PM - 5:00 PM)',
-                'scheduled_date': (now + timedelta(days=2)).date(),
-                'status': 'REQUESTED'
-            }
-        )
+        if not PickupRequest.objects.filter(citizen=citizen1, waste_type='BULK').exists():
+            PickupRequest.objects.create(
+                citizen=citizen1,
+                waste_type='BULK',
+                estimated_volume='1 old wooden wardrobe and 2 chairs',
+                description='Old furniture during home renovation, neatly kept in driveway.',
+                address='House 42, Civil Lines Enclave',
+                latitude=BASE_LAT - 0.007,
+                longitude=BASE_LNG + 0.006,
+                zone='Zone 2 - North Commercial',
+                preferred_slot='Morning (9:00 AM - 12:00 PM)',
+                scheduled_date=(now + timedelta(days=1)).date(),
+                status='SCHEDULED',
+                assigned_worker=worker2
+            )
+        if not PickupRequest.objects.filter(citizen=citizen2, waste_type='E_WASTE').exists():
+            PickupRequest.objects.create(
+                citizen=citizen2,
+                waste_type='E_WASTE',
+                estimated_volume='2 CRT monitors, 1 broken UPS, cables',
+                description='Obsolete computer parts from society library.',
+                address='Flat 302, Green Avenue Towers',
+                latitude=BASE_LAT + 0.006,
+                longitude=BASE_LNG - 0.008,
+                zone='Zone 1 - Central',
+                preferred_slot='Afternoon (2:00 PM - 5:00 PM)',
+                scheduled_date=(now + timedelta(days=2)).date(),
+                status='REQUESTED'
+            )
         self.stdout.write("-> Seeded pickup requests")
 
         CollectionPoint.objects.get_or_create(
