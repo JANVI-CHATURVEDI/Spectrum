@@ -60,10 +60,10 @@ def send_email_safe(to_email, subject, message):
 
     def _send():
         try:
-            if getattr(settings, 'BREVO_API_KEY', ''):
-                _send_via_brevo(to_email, subject, message)
-            elif getattr(settings, 'RESEND_API_KEY', ''):
+            if getattr(settings, 'RESEND_API_KEY', ''):
                 _send_via_resend(to_email, subject, message)
+            elif getattr(settings, 'BREVO_API_KEY', ''):
+                _send_via_brevo(to_email, subject, message)
             else:
                 send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [to_email])
                 logger.info('Email sent to %s: %s', to_email, subject)
