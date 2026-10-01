@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/client';
 import MapView from '../components/MapView';
 import Modal from '../components/Modal';
@@ -52,6 +52,13 @@ export default function CitizenDashboard() {
 
   const [verifyingReport, setVerifyingReport] = useState(null);
   const [verifyFeedback, setVerifyFeedback] = useState('');
+  const formRef = useRef(null);
+
+  useEffect(() => {
+    if ((viewTab === 'new-pickup' || viewTab === 'new-report') && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [viewTab]);
 
   const fetchData = async () => {
     try {
@@ -611,7 +618,7 @@ export default function CitizenDashboard() {
       )}
 
       {viewTab === 'new-pickup' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6">
+        <div ref={formRef} className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 scroll-mt-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-slate-900">Request On-Demand Bulk / E-Waste Pickup</h2>
             <button onClick={() => setViewTab('pickups')} className="text-slate-400 hover:text-slate-600 text-sm">Cancel</button>
