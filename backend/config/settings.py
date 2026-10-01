@@ -16,6 +16,15 @@ DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '*').split(',') if host.strip()]
 
+# Render auto-hostname: RENDER_EXTERNAL_HOSTNAME is set by the platform.
+# Also allow *.onrender.com so health checks pass even if the ALLOWED_HOSTS
+# env var in the dashboard is stale or missing the current hostname.
+RENDER_HOST = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
+if RENDER_HOST and RENDER_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_HOST)
+if '*' not in ALLOWED_HOSTS and '.onrender.com' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('.onrender.com')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -191,6 +200,8 @@ CORS_ALLOWED_ORIGINS = [
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',') if origin.strip()
 ]
+if RENDER_HOST and f'https://{RENDER_HOST}' not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_HOST}')
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 
