@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../api/client';
 import MapView from '../components/MapView';
 import StatusBadge from '../components/StatusBadge';
@@ -10,6 +10,8 @@ import { CheckCircle2, Clock, MapPin, Camera, Play, CheckCheck, RefreshCw, Navig
 export default function WorkerDashboard() {
   const { user, refreshUser } = useAuth();
   const [impact, setImpact] = useState({ stats: null, catalog: [] });
+  const queueRef = useRef(null);
+  const scrolledToRoute = useRef(false);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -46,6 +48,14 @@ export default function WorkerDashboard() {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  // Land straight on the route queue after login / persona switch.
+  useEffect(() => {
+    if (!loading && !scrolledToRoute.current && queueRef.current) {
+      scrolledToRoute.current = true;
+      queueRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [loading]);
 
   useEffect(() => {
     if (!liveUpdates) return;
@@ -297,7 +307,7 @@ export default function WorkerDashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div ref={queueRef} className="grid grid-cols-1 lg:grid-cols-3 gap-6 scroll-mt-20">
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
             <div className="flex items-center gap-2">
