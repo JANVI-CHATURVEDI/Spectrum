@@ -247,10 +247,40 @@ export default function CitizenDashboard() {
     }
   };
 
+  const detectPickupLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation is not supported by this browser.');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setCoords({ lat: latitude, lng: longitude });
+        setLocating(false);
+        handleLocationSelect(latitude, longitude);
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+            { headers: { Accept: 'application/json' } }
+          );
+          const d = await r.json();
+          if (d.display_name) setPickupAddress(d.display_name.split(',').slice(0, 4).join(','));
+        } catch {
+          setPickupAddress(`Pinned spot ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+        }
+      },
+      () => {
+        setLocating(false);
+        setGpsError('Could not get your location. Click the map to drop the pin instead.');
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
   const handlePickupSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
-    try {
+    setSubmitting(true);    try {
       await api.post('/api/pickups/', {
         waste_type: pickupType,
         estimated_volume: pickupVolume,
@@ -678,6 +708,22 @@ export default function CitizenDashboard() {
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="text-xs text-slate-700">
+                <span className="font-bold">Pickup location: </span>
+                {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                <span className="block text-[11px] text-slate-500">Move the map pin or use GPS — these coordinates are sent with your request.</span>
+              </div>
+              <button
+                type="button"
+                onClick={detectPickupLocation}
+                disabled={locating}
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50 whitespace-nowrap"
+              >
+                <Navigation className="w-3.5 h-3.5" /> {locating ? 'Locating…' : 'Use my GPS location'}
+              </button>
             </div>
 
             <div className="flex justify-end gap-3 pt-3">

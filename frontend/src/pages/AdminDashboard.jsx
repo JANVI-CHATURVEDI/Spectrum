@@ -10,6 +10,9 @@ export default function AdminDashboard() {
   const [overview, setOverview] = useState(null);
   const [cleanliness, setCleanliness] = useState([]);
   const [reports, setReports] = useState([]);
+  const [pickups, setPickups] = useState([]);
+  const [pickupWorker, setPickupWorker] = useState({});
+  const [assigningPickup, setAssigningPickup] = useState(null);
   const [hotspots, setHotspots] = useState([]);
   const [aiInsights, setAiInsights] = useState(null);
   const [forecast, setForecast] = useState(null);
@@ -23,16 +26,18 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [ovRes, clRes, repRes, hotRes, staffRes] = await Promise.all([
+      const [ovRes, clRes, repRes, hotRes, staffRes, pickRes] = await Promise.all([
         api.get('/api/analytics/overview/').catch(() => ({ data: null })),
         api.get('/api/analytics/cleanliness-index/').catch(() => ({ data: [] })),
         api.get('/api/reports/'),
         api.get('/api/hotspots/'),
         api.get('/api/auth/workers/').catch(() => ({ data: [] })),
+        api.get('/api/pickups/').catch(() => ({ data: [] })),
       ]);
       setOverview(ovRes.data);
       setCleanliness(clRes.data?.zones || clRes.data?.results || (Array.isArray(clRes.data) ? clRes.data : []));
       setReports(repRes.data?.results || repRes.data || []);
+      setPickups(pickRes.data?.results || pickRes.data || []);
       setHotspots(hotRes.data?.results || hotRes.data || []);
       setStaff(staffRes.data || []);
       setLoading(false);
@@ -53,6 +58,24 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchAdminData();
   }, []);
+
+  const handlePickupAssign = async (pickupId) => {
+    const workerId = pickupWorker[pickupId];
+    if (!workerId) {
+      alert('Choose a worker first.');
+      return;
+    }
+    setAssigningPickup(pickupId);
+    try {
+      await api.post('/api/operations/assign/', { pickup_id: pickupId, worker_id: workerId });
+      const pickRes = await api.get('/api/pickups/').catch(() => ({ data: [] }));
+      setPickups(pickRes.data?.results || pickRes.data || []);
+    } catch (err) {
+      alert('Error assigning pickup: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setAssigningPickup(null);
+    }
+  };
 
   const refreshStaff = async () => {
     try {
@@ -212,7 +235,66 @@ export default function AdminDashboard() {
           height="420px"
           items={reports}
           hotspots={hotspots}
+          pickups={pickups}
         />
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+          <h3 className="font-bold text-slate-900 text-base">Pickup Operations</h3>
+          <div className="flex gap-2 text-[11px] font-bold">
+            {['REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COLLECTED'].map((s) => {
+              const n = pickups.filter((p) => p.status === s).length;
+              return (
+                <span key={s} className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  {s.replace(/_/g, ' ')} · {n}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+        <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+          {pickups.map((p) => (
+            <div key={p.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-bold text-slate-900 text-xs">
+                  #{p.id} · {(p.waste_type || 'BULK').replace(/_/g, ' ')}
+                </div>
+                <div className="text-[11px] text-slate-500 truncate">{p.address}</div>
+                <div className="text-[10px] text-slate-400">
+                  {p.estimated_volume || p.volume || 'Standard load'} · {p.latitude?.toFixed ? `${Number(p.latitude).toFixed(4)}, ${Number(p.longitude).toFixed(4)}` : ''}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <StatusBadge status={p.status} />
+                {(p.status === 'REQUESTED' || p.status === 'SCHEDULED') && (
+                  <>
+                    <select
+                      value={pickupWorker[p.id] || ''}
+                      onChange={(e) => setPickupWorker((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                      className="px-2 py-1.5 border rounded-lg text-[11px] focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+                    >
+                      <option value="">Worker…</option>
+                      {staff.map((w) => (
+                        <option key={w.id} value={w.id}>{w.username}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handlePickupAssign(p.id)}
+                      disabled={assigningPickup === p.id}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition disabled:opacity-50"
+                    >
+                      {assigningPickup === p.id ? '…' : 'Assign'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {pickups.length === 0 && (
+            <div className="text-center py-4 text-xs text-slate-400">No pickup requests yet.</div>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">

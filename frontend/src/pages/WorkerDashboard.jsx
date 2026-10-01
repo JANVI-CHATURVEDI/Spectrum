@@ -371,7 +371,9 @@ export default function WorkerDashboard() {
             <div className="space-y-4 text-xs">
               <div className="p-3 bg-slate-50 rounded-xl space-y-1">
                 <div className="text-slate-400 text-[10px] font-semibold uppercase">Current Job</div>
-                <div className="font-bold text-slate-900 text-sm">#{selectedTask.id} - {getTaskReport(selectedTask)?.title || 'Sanitation Task'}</div>
+                <div className="font-bold text-slate-900 text-sm">
+                  #{selectedTask.id} - {getTaskReport(selectedTask)?.title || (getTaskPickup(selectedTask) ? `${(getTaskPickup(selectedTask).waste_type || 'BULK').replace(/_/g, ' ')} Pickup #${getTaskPickup(selectedTask).id}` : 'Sanitation Task')}
+                </div>
                 <div className="text-slate-600">{getTaskReport(selectedTask)?.address || getTaskPickup(selectedTask)?.address}</div>
                 <div className="pt-2 flex items-center justify-between">
                   <StatusBadge status={selectedTask.status} />

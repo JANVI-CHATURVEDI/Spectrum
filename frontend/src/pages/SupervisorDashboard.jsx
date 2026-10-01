@@ -10,6 +10,7 @@ import { Users, AlertCircle, CheckCircle, Flame, UserCheck, ArrowRight, RefreshC
 export default function SupervisorDashboard() {
   const [teamSummary, setTeamSummary] = useState(null);
   const [reports, setReports] = useState([]);
+  const [pickups, setPickups] = useState([]);
   const [hotspots, setHotspots] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,14 +24,16 @@ export default function SupervisorDashboard() {
   const fetchSupervisorData = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
-      const [sumRes, repRes, hotRes, workRes] = await Promise.all([
+      const [sumRes, repRes, hotRes, workRes, pickRes] = await Promise.all([
         api.get('/api/operations/team-summary/').catch(() => ({ data: null })),
         api.get('/api/reports/'),
         api.get('/api/hotspots/'),
         api.get('/api/auth/workers/').catch(() => ({ data: [] })),
+        api.get('/api/pickups/').catch(() => ({ data: [] })),
       ]);
       setTeamSummary(sumRes.data);
       setReports(repRes.data?.results || repRes.data || []);
+      setPickups(pickRes.data?.results || pickRes.data || []);
       setHotspots(hotRes.data?.results || hotRes.data || []);
       setWorkers(workRes.data || []);
     } catch (err) {
@@ -57,11 +60,14 @@ export default function SupervisorDashboard() {
     if (!selectedWorkerId || !assignTarget) return;
     setAssigning(true);
     try {
-      await api.post('/api/operations/assign/', {
-        report_id: assignTarget.id,
-        worker_id: selectedWorkerId,
-        priority: assignTarget.priority_level || 'MEDIUM',
-      });
+      const payload = { worker_id: selectedWorkerId };
+      if (assignTarget.kind === 'pickup') {
+        payload.pickup_id = assignTarget.id;
+      } else {
+        payload.report_id = assignTarget.id;
+        payload.priority = assignTarget.priority_level || 'MEDIUM';
+      }
+      await api.post('/api/operations/assign/', payload);
       setAssignTarget(null);
       setSelectedWorkerId('');
       fetchSupervisorData();
@@ -112,7 +118,8 @@ export default function SupervisorDashboard() {
           height="400px"
           items={reports}
           hotspots={hotspots}
-          onItemClick={(item) => setAssignTarget(item)}
+          pickups={pickups}
+          onItemClick={(item) => setAssignTarget({ ...item, kind: 'report' })}
         />
       </div>
 
@@ -127,6 +134,16 @@ export default function SupervisorDashboard() {
             }`}
           >
             Pending Dispatch Queue ({reports.filter(r => r.status === 'REPORTED' || r.status === 'VERIFIED').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('pickups')}
+            className={`px-3 py-1.5 rounded-lg transition ${
+              activeTab === 'pickups'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Pickup Requests ({pickups.filter(p => p.status === 'REQUESTED' || p.status === 'SCHEDULED').length})
           </button>
           <button
             onClick={() => setActiveTab('verifications')}
@@ -180,7 +197,7 @@ export default function SupervisorDashboard() {
                   <div className="flex items-center gap-3">
                     <PriorityBadge level={report.priority_level} score={report.priority_score} factors={report.priority_factors} />
                     <button
-                      onClick={() => setAssignTarget(report)}
+                      onClick={() => setAssignTarget({ ...report, kind: 'report' })}
                       className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
                     >
                       <span>Dispatch</span>
@@ -191,6 +208,40 @@ export default function SupervisorDashboard() {
               ))}
               {reports.filter(r => r.status === 'REPORTED' || r.status === 'VERIFIED').length === 0 && !loading && (
                 <div className="p-8 text-center text-sm text-slate-400">All pending reports currently dispatched!</div>
+              )}
+            </div>
+          </div>
+        ) : activeTab === 'pickups' ? (
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-bold text-slate-900 text-base">Unassigned Pickup Requests</h3>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {pickups.filter(p => p.status === 'REQUESTED' || p.status === 'SCHEDULED').map((pickup) => (
+                <div key={pickup.id} className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-50">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 text-sm">#{pickup.id} · {(pickup.waste_type || 'BULK').replace(/_/g, ' ')}</span>
+                      <StatusBadge status={pickup.status} />
+                    </div>
+                    <div className="text-xs text-slate-600 line-clamp-1">{pickup.address}</div>
+                    <div className="text-[11px] text-slate-400">
+                      {pickup.estimated_volume || pickup.volume || 'Standard load'} · {pickup.preferred_slot || pickup.preferred_time || 'Any slot'} · {pickup.created_at ? new Date(pickup.created_at).toLocaleDateString() : ''}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setAssignTarget({ ...pickup, kind: 'pickup', title: `${(pickup.waste_type || 'BULK').replace(/_/g, ' ')} pickup #${pickup.id}` })}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                  >
+                    <span>Dispatch</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {pickups.filter(p => p.status === 'REQUESTED' || p.status === 'SCHEDULED').length === 0 && !loading && (
+                <div className="p-8 text-center text-sm text-slate-400">No pending pickup requests — all assigned!</div>
               )}
             </div>
           </div>
@@ -295,11 +346,13 @@ export default function SupervisorDashboard() {
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 modal-pop my-auto shrink-0 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-900">Dispatch Task to Field Worker</h3>
             <div className="p-3 bg-slate-50 rounded-lg text-xs space-y-1">
-              <strong>{assignTarget.title}</strong>
+              <strong>{assignTarget.kind === 'pickup' ? `Pickup #${assignTarget.id} · ${(assignTarget.waste_type || 'BULK').replace(/_/g, ' ')}` : assignTarget.title}</strong>
               <div className="text-slate-500">{assignTarget.address}</div>
-              <div className="pt-1">
-                <PriorityBadge level={assignTarget.priority_level} score={assignTarget.priority_score} factors={assignTarget.priority_factors} />
-              </div>
+              {assignTarget.kind !== 'pickup' && (
+                <div className="pt-1">
+                  <PriorityBadge level={assignTarget.priority_level} score={assignTarget.priority_score} factors={assignTarget.priority_factors} />
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleAssignTask} className="space-y-4">
