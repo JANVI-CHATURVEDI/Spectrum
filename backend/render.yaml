@@ -13,3 +13,31 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: ALLOWED_HOSTS
+        value: swachdrishti-api.onrender.com
+      - key: CORS_ALLOW_ALL
+        value: False
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://swachdrishti.vercel.app
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://swachdrishti.vercel.app,https://swachdrishti-api.onrender.com
+      - key: FRONTEND_URL
+        value: https://swachdrishti.vercel.app
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: SwachDrishti <onboarding@resend.dev>
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_USE_TLS
+        value: True
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        value: SwachDrishti <swachdristi1010@gmail.com>

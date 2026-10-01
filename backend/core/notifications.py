@@ -29,31 +29,6 @@ def _send_via_resend(to_email, subject, message):
     logger.info('Email sent via Resend to %s: %s', to_email, subject)
 
 
-def _send_via_brevo(to_email, subject, message):
-    """HTTP email API (port 443) — free 300/day, delivers to anyone."""
-    import requests
-
-    api_key = getattr(settings, 'BREVO_API_KEY', '')
-    sender = getattr(settings, 'BREVO_SENDER', '') or 'swachdristi1010@gmail.com'
-    name, _, addr = sender.partition('<')
-    sender_email = (addr.rstrip('>') or name).strip() or 'swachdristi1010@gmail.com'
-    sender_name = name.strip() or 'SwachDrishti'
-    resp = requests.post(
-        'https://api.brevo.com/v3/smtp/email',
-        headers={'api-key': api_key, 'Content-Type': 'application/json'},
-        json={
-            'sender': {'name': sender_name, 'email': sender_email},
-            'to': [{'email': to_email}],
-            'subject': subject,
-            'textContent': message,
-        },
-        timeout=20,
-    )
-    if resp.status_code not in (200, 201):
-        raise RuntimeError(f'Brevo rejected send: {resp.status_code} {resp.text[:200]}')
-    logger.info('Email sent via Brevo to %s: %s', to_email, subject)
-
-
 def send_email_safe(to_email, subject, message):
     if not to_email:
         return False
@@ -62,8 +37,6 @@ def send_email_safe(to_email, subject, message):
         try:
             if getattr(settings, 'RESEND_API_KEY', ''):
                 _send_via_resend(to_email, subject, message)
-            elif getattr(settings, 'BREVO_API_KEY', ''):
-                _send_via_brevo(to_email, subject, message)
             else:
                 send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [to_email])
                 logger.info('Email sent to %s: %s', to_email, subject)
