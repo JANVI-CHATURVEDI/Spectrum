@@ -219,7 +219,7 @@ export default function WorkerDashboard() {
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
             Field Sanitation Operative
           </span>
-          <h1 className="text-3xl font-extrabold mt-2 tracking-tight">Today's Assigned Route</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold mt-2 tracking-tight">Today's Assigned Route</h1>
           <p className="text-teal-100 mt-1 max-w-xl text-sm">
             Access assigned waste heaps, optimize your collection circuit, and log AI-verified before/after evidence.
           </p>

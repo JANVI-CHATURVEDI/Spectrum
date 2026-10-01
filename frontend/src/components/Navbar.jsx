@@ -6,6 +6,7 @@ import {
   Award, LogOut, FlaskConical, Menu, X, Bell,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useDismiss } from './ui';
 
 const PERSONAS = [
   { id: 'citizen', label: 'Citizen', icon: User, desc: 'Report & track neighborhood waste' },
@@ -36,6 +37,10 @@ export default function Navbar({ activeTab, setActiveTab }) {
   const [unread, setUnread] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const notifRef = useDismiss(notifOpen, () => setNotifOpen(false));
+  const userRef = useDismiss(userOpen, () => setUserOpen(false));
+  const demoRef = useDismiss(demoOpen, () => setDemoOpen(false));
 
   const handlePersona = async (roleId) => {
     await switchRole(roleId);
@@ -151,7 +156,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {user && (
-              <div className="relative">
+              <div className="relative" ref={notifRef}>
                 <button
                   onClick={() => { setNotifOpen(o => !o); setUserOpen(false); setDemoOpen(false); }}
                   aria-label="Notifications"
@@ -165,7 +170,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
                   )}
                 </button>
                 {notifOpen && (
-                  <div className="absolute right-0 top-full z-50 mt-2 max-h-96 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white py-2 shadow-xl">
+                  <div className="absolute right-0 top-full z-50 mt-2 max-h-96 w-[calc(100vw-2.5rem)] max-w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white py-2 shadow-xl">
                     <div className="flex items-center justify-between px-3 py-1.5">
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Notifications</span>
                       <button onClick={markAllRead} className="text-[11px] font-bold text-emerald-700 hover:underline">
@@ -194,14 +199,14 @@ export default function Navbar({ activeTab, setActiveTab }) {
               </div>
             )}
             {user && (role === 'CITIZEN' || role === 'WORKER') && (
-              <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+              <div className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 min-[420px]:flex">
                 <Award className="h-3.5 w-3.5 text-emerald-600" />
                 <span>{user.impact_points ?? 0} pts</span>
               </div>
             )}
 
             {user ? (
-              <div className="relative">
+              <div className="relative" ref={userRef}>
                 <button
                   onClick={() => { setUserOpen(o => !o); setDemoOpen(false); setNotifOpen(false); }}
                   className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 py-1 pl-1 pr-2.5 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-100"
@@ -236,7 +241,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
               </button>
             )}
 
-            <div className="relative">
+            <div className="relative" ref={demoRef}>
               <button
                 onClick={() => { setDemoOpen(o => !o); setUserOpen(false); setNotifOpen(false); }}
                 title="One-click demo personas for evaluation"
@@ -246,7 +251,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
                 <span className="hidden sm:inline">Demo</span>
               </button>
               {demoOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white py-2 shadow-xl">
+                <div className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-xl border border-slate-200 bg-white py-2 shadow-xl">
                   <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                     Switch persona for demo
                   </div>

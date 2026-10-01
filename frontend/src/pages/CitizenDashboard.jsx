@@ -290,7 +290,7 @@ export default function CitizenDashboard() {
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
             Citizen Dashboard
           </span>
-          <h1 className="text-3xl font-extrabold mt-2 tracking-tight">Keep Your City Pristine</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold mt-2 tracking-tight">Keep Your City Pristine</h1>
           <p className="text-emerald-100 mt-1 max-w-xl text-sm">
             Empower municipal crews with location-verified waste reports, track pickup progress, and confirm resolutions.
           </p>

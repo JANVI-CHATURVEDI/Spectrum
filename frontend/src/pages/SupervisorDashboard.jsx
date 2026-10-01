@@ -86,7 +86,7 @@ export default function SupervisorDashboard() {
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
             Ward & Operations Supervisor
           </span>
-          <h1 className="text-3xl font-extrabold mt-2 tracking-tight">Fleet & Dispatch Control</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold mt-2 tracking-tight">Fleet & Dispatch Control</h1>
           <p className="text-blue-100 mt-1 max-w-xl text-sm">
             Monitor real-time crew capacity, identify critical unassigned waste heaps, and balance ward tasks.
           </p>

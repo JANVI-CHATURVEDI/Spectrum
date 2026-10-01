@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Inbox } from 'lucide-react';
 
 export function Card({ className = '', children, ...rest }) {
@@ -72,6 +72,27 @@ export function useLockBody(locked) {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
   }, [locked]);
+}
+
+/** Dismiss popups on outside click/tap or Escape. Attach ref to the wrapper. */
+export function useDismiss(active, onDismiss) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!active) return;
+    const onPointer = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onDismiss();
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') onDismiss();
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [active, onDismiss]);
+  return ref;
 }
 
 export function loadJSON(key, fallback) {

@@ -177,7 +177,7 @@ export default function Login() {
           <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wide">
             <span className="flex-1 h-px bg-slate-100" /> Demo shortcuts <span className="flex-1 h-px bg-slate-100" />
           </div>
-          <div className="grid grid-cols-4 gap-2 mt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
             {DEMO_ROLES.map(r => (
               <button
                 key={r.id} onClick={() => demoLogin(r.id)} disabled={busy}

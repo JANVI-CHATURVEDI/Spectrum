@@ -39,7 +39,7 @@ export default function PublicTransparency() {
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
             Public Civic Ledger
           </span>
-          <h1 className="text-3xl font-extrabold mt-2 tracking-tight">Open City Sanitation Transparency</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold mt-2 tracking-tight">Open City Sanitation Transparency</h1>
           <p className="text-blue-50 mt-1 max-w-xl text-sm">
             Publicly verifiable civic operations. Every report, turnaround timeline, and verified resolution is open for scrutiny.
           </p>

@@ -223,7 +223,7 @@ export default function AwarenessPage() {
           <span className="text-xs font-semibold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full">
             Civic Education & Circular Economy
           </span>
-          <h1 className="text-3xl font-extrabold mt-3 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold mt-3 tracking-tight">
             Know Your Waste &amp; Segregate Smartly
           </h1>
           <p className="text-teal-100 mt-1 max-w-xl text-sm">
@@ -298,13 +298,13 @@ export default function AwarenessPage() {
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-emerald-600" /> Waste Stream Separation Standards
           </h2>
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={guideQuery}
               onChange={(e) => setGuideQuery(e.target.value)}
               placeholder="Filter streams or items…"
-              className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs w-56 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs w-full sm:w-56 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             />
           </div>
         </div>
@@ -509,13 +509,13 @@ export default function AwarenessPage() {
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <MapPin className="w-5 h-5 text-blue-600" /> Authorized Public Drop-Off Centers
           </h2>
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={pointQuery}
               onChange={(e) => setPointQuery(e.target.value)}
               placeholder="Search zone, name, type…"
-              className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs w-56 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs w-full sm:w-56 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             />
           </div>
         </div>

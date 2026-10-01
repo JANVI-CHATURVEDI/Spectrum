@@ -82,13 +82,13 @@ export default function AdminDashboard() {
           <span className="text-xs font-semibold tracking-wider uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full">
             Municipal Command Center
           </span>
-          <h1 className="text-3xl font-extrabold mt-2 tracking-tight">City Waste Intelligence & Policy</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold mt-2 tracking-tight">City Waste Intelligence & Policy</h1>
           <p className="text-slate-300 mt-1 max-w-xl text-sm">
             Holistic urban sanitation telemetry, AI predictive hotspot mitigation, and ward cleanliness scoring.
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 min-[480px]:grid-cols-3 gap-3">
           <div className="bg-white/5 border border-white/10 p-3 rounded-xl text-center">
             <div className="text-xl font-bold text-emerald-400">{overview?.resolved_reports_count ?? 142}</div>
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Resolved Heaps</div>
