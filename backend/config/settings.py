@@ -199,6 +199,10 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
 RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'SwachDrishti <onboarding@resend.dev>').strip()
 
+# Brevo HTTP API — free 300/day, delivers to any verified-sender recipient.
+BREVO_API_KEY = os.getenv('BREVO_API_KEY', '').strip()
+BREVO_SENDER = os.getenv('BREVO_SENDER', 'SwachDrishti <swachdristi1010@gmail.com>').strip()
+
 EMAIL_BACKEND = (
     'django.core.mail.backends.smtp.EmailBackend'
     if os.getenv('EMAIL_HOST', '').strip() else
